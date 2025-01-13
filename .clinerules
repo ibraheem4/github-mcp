@@ -1,0 +1,145 @@
+# General Developer Guidelines for AI Agents
+
+## 1. **Safety and Operations**
+
+### Git and GitHub
+
+- Never push directly to `main`/`master` branches.
+- Avoid creating or pushing branches or PRs without explicit user approval.
+- Always show Git commands before execution, including the purpose and expected outcomes.
+- Wait for explicit confirmation before executing any command.
+
+### File Changes
+
+- Present proposed changes (diffs) before committing them.
+- Obtain approval before creating or modifying files.
+- Clearly explain the purpose and potential impact of changes.
+- Always confirm before saving changes.
+
+### Communication
+
+- Clearly explain planned actions before executing them.
+- Provide options for alternative approaches when available.
+- Confirm critical steps and ask for explicit user approval before proceeding.
+- Provide status updates after completing significant tasks or actions.
+
+### Risk Management
+
+- Treat all operations as potentially destructive unless explicitly noted otherwise.
+- Highlight risks, side effects, and rollback steps for all significant changes.
+- Clarify any uncertainties before proceeding.
+
+---
+
+## 2. **Code Development Standards**
+
+### General Principles
+
+- Prioritize readability and maintainability over cleverness or over-engineering.
+- Provide concise, informative explanations of changes.
+- Display only relevant, modified code snippets unless explicitly asked to show the entire file.
+
+### Tools and Frameworks
+
+- **Frontend**: Next.js with TypeScript, Tailwind CSS, Shadcn UI, Radix, and `phosphor-react`.
+- **Backend**: FastAPI or Django with Django-Ninja for RESTful APIs.
+- **Package Management**: Use `pnpm` for frontend, `pipenv` for Python backend.
+- **Containerization**: Employ `docker compose` and Docker multi-stage builds for streamlined container setups.
+
+### Coding Standards
+
+#### Code Style and Structure
+
+- Use functional and declarative programming patterns; avoid overuse of classes.
+- Use descriptive variable names (e.g., `isLoading`, `hasError`).
+- Structure files logically: exported component → subcomponents → helpers → types.
+
+#### Naming Conventions
+
+- Use `kebab-case` for directories (e.g., `components/auth-wizard`).
+- Prefer named exports for components and utility functions.
+
+#### TypeScript Practices
+
+- Use TypeScript with strict typing; prefer interfaces over types.
+- Replace enums with maps when appropriate.
+- Use functional components for React development.
+
+#### Syntax and Formatting
+
+- Write concise JSX and use declarative syntax where possible.
+- Enforce consistent formatting with Prettier and ESLint.
+
+---
+
+## 3. **Performance and UI Optimization**
+
+### Performance
+
+- Minimize `use client`, `useEffect`, and excessive state management; favor React Server Components (RSC).
+- Optimize Web Vitals: LCP, CLS, FID.
+- Implement lazy loading for non-critical components and images.
+
+### UI Design
+
+- Follow a mobile-first approach with responsive Tailwind CSS.
+- Use modern image formats (e.g., WebP) with size metadata and lazy loading.
+- Avoid unnecessary client-side rendering; prefer SSR when possible.
+
+---
+
+## 4. **Best Practices**
+
+### Commit Standards
+
+- Use conventional commit messages to maintain consistency (e.g., `feat:`, `fix:`, `chore:`).
+- Use feature branches and feature flags for gradual rollouts.
+
+### Logging and Monitoring
+
+- Implement structured logging formats for easier debugging.
+- Document significant changes in OpenAPI specs or project documentation.
+
+### Testing Strategy
+
+- Write unit tests for utilities.
+- Use React Testing Library for components and Playwright for E2E testing.
+- Prioritize testing user behavior over implementation specifics.
+
+---
+
+## 5. **Development Workflow**
+
+### Workflow Automation
+
+- Use GitHub Actions for CI/CD pipelines.
+- Implement `pre-commit` hooks for code quality checks.
+
+### State Management
+
+- Use React Query for server state and Zustand for complex client-side state sparingly.
+- Prefer URL state management (e.g., `nuqs`) over local state when feasible.
+
+---
+
+## 6. **AI Collaboration Principles**
+
+### Explain, Confirm, Execute
+
+1. **Explain**: Describe what you plan to do, including purpose and expected outcomes.
+2. **Confirm**: Wait for explicit approval before proceeding with commands or changes.
+3. **Execute**: Provide updates and results upon completion.
+
+### Propose Alternatives
+
+- Offer multiple approaches when applicable, explaining the trade-offs for each.
+
+### Maintain Transparency
+
+- Clearly communicate any uncertainties or assumptions.
+- Highlight potential risks and include rollback options for significant changes.
+
+### Optimize Feedback
+
+- Avoid excessive verbosity; tailor explanations to the user’s preferred level of detail.
+- Provide actionable, concise answers for specific queries.
