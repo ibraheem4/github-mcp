@@ -48,9 +48,37 @@ interface CreatePullRequestArgs {
     width?: number;
   }>;
   draft?: boolean;
+  maintainer_can_modify?: boolean;
   labels?: string[];
   reviewers?: string[];
   assignees?: string[];
+}
+
+interface ListPullRequestsArgs {
+  owner: string;
+  repo: string;
+  state?: "open" | "closed" | "all";
+}
+
+interface UpdatePullRequestArgs {
+  owner: string;
+  repo: string;
+  pull_number: number;
+  title?: string;
+  body?: string;
+  state?: "open" | "closed";
+}
+
+interface GeneratePrDescriptionArgs {
+  owner: string;
+  repo: string;
+  pull_number: number;
+}
+
+interface FileChange {
+  filePath: string;
+  additions: number;
+  deletions: number;
 }
 
 function generatePrBody(args: CreatePullRequestArgs): string {
@@ -174,21 +202,6 @@ function generatePrBody(args: CreatePullRequestArgs): string {
   return template;
 }
 
-interface ListPullRequestsArgs {
-  owner: string;
-  repo: string;
-  state?: "open" | "closed" | "all";
-}
-
-interface UpdatePullRequestArgs {
-  owner: string;
-  repo: string;
-  pull_number: number;
-  title?: string;
-  body?: string;
-  state?: "open" | "closed";
-}
-
 class GitHubServer {
   private server: Server;
   private octokit: Octokit;
@@ -196,7 +209,7 @@ class GitHubServer {
   constructor() {
     this.server = new Server(
       {
-        name: "github",
+        name: "github-pr",
         version: "0.1.0",
       },
       {
@@ -205,6 +218,7 @@ class GitHubServer {
             create_pull_request: {},
             list_pull_requests: {},
             update_pull_request: {},
+            generate_pr_description: {},
           },
         },
       }
@@ -333,6 +347,10 @@ class GitHubServer {
                 type: "boolean",
                 description: "Create PR as draft",
               },
+              maintainer_can_modify: {
+                type: "boolean",
+                description: "Whether maintainers can modify the pull request",
+              },
               labels: {
                 type: "array",
                 items: { type: "string" },
@@ -409,6 +427,28 @@ class GitHubServer {
             required: ["owner", "repo", "pull_number"],
           },
         },
+        {
+          name: "generate_pr_description",
+          description: "Generate a PR description based on the diff",
+          inputSchema: {
+            type: "object",
+            properties: {
+              owner: {
+                type: "string",
+                description: "Repository owner",
+              },
+              repo: {
+                type: "string",
+                description: "Repository name",
+              },
+              pull_number: {
+                type: "number",
+                description: "Pull request number",
+              },
+            },
+            required: ["owner", "repo", "pull_number"],
+          },
+        },
       ],
     }));
 
@@ -430,6 +470,7 @@ class GitHubServer {
                 head: args.head,
                 base: args.base,
                 draft: args.draft,
+                maintainer_can_modify: args.maintainer_can_modify,
               });
 
               const prNumber = response.data.number;
@@ -540,6 +581,128 @@ class GitHubServer {
             };
           }
 
+          case "generate_pr_description": {
+            const args = request.params
+              .arguments as unknown as GeneratePrDescriptionArgs;
+
+            // Get the PR diff
+            const { data: diffText } = await this.octokit.request<string>(
+              "GET /repos/{owner}/{repo}/pulls/{pull_number}",
+              {
+                owner: args.owner,
+                repo: args.repo,
+                pull_number: args.pull_number,
+                mediaType: {
+                  format: "diff",
+                },
+              }
+            );
+
+            // Get the PR details for additional context
+            const { data: pr } = await this.octokit.pulls.get({
+              owner: args.owner,
+              repo: args.repo,
+              pull_number: args.pull_number,
+            });
+
+            // Parse diff to extract file changes
+            const files = (diffText as string).split("diff --git").slice(1);
+            const fileChanges: FileChange[] = files.map((file: string) => {
+              const lines = file.split("\n");
+              const filePath = lines[0].match(/b\/(.*)/)?.[1] || "";
+              const additions = lines.filter((line: string) =>
+                line.startsWith("+")
+              ).length;
+              const deletions = lines.filter((line: string) =>
+                line.startsWith("-")
+              ).length;
+              return { filePath, additions, deletions };
+            });
+
+            // Generate key changes based on file analysis
+            const keyChanges = fileChanges.map((file: FileChange) => {
+              const changeType =
+                file.additions && file.deletions
+                  ? "Modified"
+                  : file.additions
+                  ? "Added"
+                  : file.deletions
+                  ? "Removed"
+                  : "Changed";
+              return `${changeType} \`${file.filePath}\` (${file.additions} additions, ${file.deletions} deletions)`;
+            });
+
+            // Generate code highlights based on significant changes
+            const codeHighlights = fileChanges
+              .filter(
+                (file: FileChange) => file.additions + file.deletions > 10
+              )
+              .map(
+                (file: FileChange) =>
+                  `Significant changes in \`${file.filePath}\``
+              );
+
+            // Determine PR type based on changes
+            const getType = () => {
+              const newFiles = fileChanges.some(
+                (f: FileChange) => f.additions && !f.deletions
+              );
+              const onlyDocs = fileChanges.every((f: FileChange) =>
+                /\.(md|txt|doc)$/.test(f.filePath)
+              );
+              const hasTests = fileChanges.some(
+                (f: FileChange) =>
+                  f.filePath.includes("test") || f.filePath.includes("spec")
+              );
+
+              if (onlyDocs) return "docs";
+              if (hasTests && !newFiles) return "test";
+              if (newFiles) return "feat";
+              return "fix";
+            };
+
+            const prArgs: CreatePullRequestArgs = {
+              owner: args.owner,
+              repo: args.repo,
+              title: pr.title,
+              head: pr.head.ref,
+              base: pr.base.ref,
+              overview: pr.title,
+              keyChanges,
+              codeHighlights,
+              testing: ["Automated tests included", "Manual testing performed"],
+              checklist: {
+                adhereToConventions: true,
+                testsIncluded: true,
+                documentationUpdated: fileChanges.some((f: FileChange) =>
+                  f.filePath.includes(".md")
+                ),
+                changesVerified: true,
+                screenshotsAttached: false,
+              },
+            };
+
+            // Generate PR body using the analyzed content
+            const body = generatePrBody(prArgs);
+
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    {
+                      type: getType(),
+                      title: `${getType()}(${args.repo}): ${pr.title}`,
+                      body,
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            };
+          }
+
           default:
             throw new McpError(
               ErrorCode.MethodNotFound,
@@ -561,7 +724,7 @@ class GitHubServer {
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error("GitHub MCP server running on stdio");
+    console.error("GitHub PR MCP server running on stdio");
   }
 }
 

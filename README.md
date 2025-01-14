@@ -1,92 +1,85 @@
-# GitHub PR Management Service
+# GitHub PR MCP Server
 
-A scalable SaaS service that provides advanced GitHub Pull Request management capabilities through a REST API. Built on top of the Model Context Protocol (MCP) server.
+An enhanced GitHub Pull Request management server built on the Model Context Protocol (MCP). This server extends the base @modelcontextprotocol/server-github functionality with rich PR creation features.
 
 ## Features
 
-- 🔄 Advanced PR Management
-  - Create PRs with structured templates
-  - List and filter PRs
-  - Update PR status and content
-- 👥 User Management
-  - Authentication & Authorization
-  - Role-based access control
-- 📊 Usage Tracking
-  - Per-user usage metrics
-  - Monthly usage history
-  - Endpoint-specific analytics
-- 💳 Subscription Tiers
-  - Free tier: 50 operations/month
-  - Developer tier: 500 operations/month
-  - Team tier: 2000 operations/month
-  - Enterprise tier: Unlimited operations
+- 🔄 Complete Base Server Compatibility
+  - Create PRs with required fields (owner, repo, title, head, base)
+  - Optional fields support (body, draft, maintainer_can_modify)
+  - List and update PRs with matching schemas
+
+- 🚀 Enhanced PR Creation
+  - Structured PR templates with sections:
+    - Overview
+    - Key Changes
+    - Code Highlights
+    - Testing Details
+  - Checklist items for PR quality
+  - Media attachments support
+  - Labels, reviewers, and assignees management
+  - Issue linking and tagging
 
 ## Prerequisites
 
 - Node.js 18+
-- AWS Account with appropriate permissions
-- GitHub OAuth App credentials
-- Stripe account for billing
+- GitHub Personal Access Token with repo scope
+- Pull request template file at `.github/pull_request_template.md` (example below)
 
-## Environment Variables
+### Example PR Template
 
-Create a `.env` file in the root directory with the following variables:
+Create `.github/pull_request_template.md` with sections that match the enhanced PR features:
 
-```env
-# AWS Configuration
-AWS_REGION=us-west-2
-AWS_ACCESS_KEY_ID=your_access_key
-AWS_SECRET_ACCESS_KEY=your_secret_key
+```markdown
+## Overview
 
-# GitHub Configuration
-GITHUB_APP_ID=your_app_id
-GITHUB_PRIVATE_KEY=your_private_key
-GITHUB_WEBHOOK_SECRET=your_webhook_secret
+Summarize the purpose and scope of this PR.
 
-# Clerk Configuration
-CLERK_SECRET_KEY=your_clerk_secret_key
-CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+---
 
-# Stripe Configuration
-STRIPE_SECRET_KEY=your_stripe_secret_key
-STRIPE_WEBHOOK_SECRET=your_stripe_webhook_secret
-STRIPE_PRICE_ID_DEVELOPER=your_developer_price_id
-STRIPE_PRICE_ID_TEAM=your_team_price_id
-STRIPE_PRICE_ID_ENTERPRISE=your_enterprise_price_id
+## Key Changes
 
-# Server Configuration
-PORT=3000
-NODE_ENV=development
+List the key changes made in this PR.
+
+---
+
+## Code Highlights
+
+Identify important code sections that reviewers should focus on.
+
+---
+
+## Testing
+
+Outline testing approach and results.
+
+---
+
+## Links
+
+Include relevant links and references.
+
+---
+
+## Additional Notes
+
+Provide any extra context or notes for reviewers.
+
+---
+
+### Issue Tagging
+
+Link related issues here.
+
+---
 ```
-
-## Authentication
-
-This service uses [Clerk](https://clerk.dev) for authentication and user management. To set up authentication:
-
-1. Create a Clerk application at https://dashboard.clerk.dev
-2. Configure your application settings
-3. Add the Clerk environment variables to your `.env` file
-4. Users will be automatically assigned the "free" tier upon signup
-5. Use the Clerk Dashboard to manage users and assign different tiers
-
-### User Tiers
-
-User tiers are stored in Clerk's user metadata with the following structure:
-
-```json
-{
-  "tier": "free | developer | team | enterprise"
-}
-```
-
-You can update a user's tier through the Clerk Dashboard or using the Clerk Admin API.
 
 ## Installation
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/github-pr-service.git
-   cd github-pr-service
+   git clone https://github.com/yourusername/cline-github-mcp.git
+   cd cline-github-mcp
    ```
 
 2. Install dependencies:
@@ -99,78 +92,191 @@ You can update a user's tier through the Clerk Dashboard or using the Clerk Admi
    npm run build
    ```
 
-4. Start the server:
-   ```bash
-   npm start
-   ```
+## Environment Variables
+
+Create a `.env` file in the root directory:
+
+```env
+# Required for GitHub API access
+GITHUB_TOKEN=your_github_personal_access_token
+```
+
+## Usage
+
+### Running the Server
+
+Start the MCP server:
+```bash
+npm start
+```
 
 For development:
 ```bash
 npm run dev
 ```
 
-## API Documentation
+### MCP Server Configuration
 
-### Authentication
+This enhanced GitHub PR server can run alongside the base GitHub server in various environments. Here's how to configure each:
 
-All API endpoints require a valid Clerk session token in the Authorization header:
+#### Claude Desktop
 
+1. Open Claude Desktop settings:
+   - Mac: `~/Library/Application Support/Claude/claude_desktop_config.json`
+   - Windows: `%APPDATA%/Claude/claude_desktop_config.json`
+   - Linux: `~/.config/Claude/claude_desktop_config.json`
+
+2. Add both servers to the configuration:
+   ```json
+   {
+     "mcpServers": {
+       "github": {
+         "command": "npx",
+         "args": ["-y", "@modelcontextprotocol/server-github"],
+         "env": {
+           "GITHUB_TOKEN": "your_github_personal_access_token"
+         }
+       },
+       "github-pr": {
+         "command": "node",
+         "args": ["/path/to/cline-github-mcp/build/index.js"],
+         "env": {
+           "GITHUB_TOKEN": "your_github_personal_access_token"
+         }
+       }
+     }
+   }
+   ```
+
+#### VSCode (Cline Extension)
+
+1. Open VSCode settings:
+   - Mac: `~/Library/Application Support/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+   - Windows: `%APPDATA%/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+   - Linux: `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
+
+2. Add both servers to the configuration:
+   ```json
+   {
+     "mcpServers": {
+       "github": {
+         "command": "npx",
+         "args": ["-y", "@modelcontextprotocol/server-github"],
+         "env": {
+           "GITHUB_TOKEN": "your_github_personal_access_token"
+         }
+       },
+       "github-pr": {
+         "command": "node",
+         "args": ["/path/to/cline-github-mcp/build/index.js"],
+         "env": {
+           "GITHUB_TOKEN": "your_github_personal_access_token"
+         }
+       }
+     }
+   }
+   ```
+
+#### VSCode (Roo Cline Extension)
+
+1. Open Roo Cline settings:
+   - Mac: `~/Library/Application Support/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json`
+   - Windows: `%APPDATA%/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json`
+   - Linux: `~/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json`
+
+2. Add both servers to the configuration:
+   ```json
+   {
+     "mcpServers": {
+       "github": {
+         "command": "npx",
+         "args": ["-y", "@modelcontextprotocol/server-github"],
+         "env": {
+           "GITHUB_TOKEN": "your_github_personal_access_token"
+         }
+       },
+       "github-pr": {
+         "command": "node",
+         "args": ["/path/to/cline-github-mcp/build/index.js"],
+         "env": {
+           "GITHUB_TOKEN": "your_github_personal_access_token"
+         }
+       }
+     }
+   }
+   ```
+
+3. Restart your application after making changes
+
+Note: Both servers can run simultaneously in all environments. The base `github` server provides standard GitHub operations, while the `github-pr` server adds enhanced PR creation features. You can use either server based on your needs - use the base server for simple operations or the enhanced server when you need rich PR features.
+
+### Available Tools
+
+#### create_pull_request
+Create a new pull request with enhanced features
+```typescript
+{
+  // Required fields (base compatibility)
+  owner: string;
+  repo: string;
+  title: string;
+  head: string;
+  base: string;
+
+  // Optional fields (base compatibility)
+  body?: string;
+  draft?: boolean;
+  maintainer_can_modify?: boolean;
+
+  // Enhanced features
+  overview?: string;
+  keyChanges?: string[];
+  codeHighlights?: string[];
+  testing?: string[];
+  links?: Array<{ title: string; url: string }>;
+  additionalNotes?: string;
+  issueIds?: string[];
+  checklist?: {
+    adhereToConventions?: boolean;
+    testsIncluded?: boolean;
+    documentationUpdated?: boolean;
+    changesVerified?: boolean;
+    screenshotsAttached?: boolean;
+  };
+  attachments?: Array<{
+    type: "image" | "video" | "diagram";
+    alt: string;
+    url: string;
+    width?: number;
+  }>;
+  labels?: string[];
+  reviewers?: string[];
+  assignees?: string[];
+}
 ```
-Authorization: Bearer your_clerk_session_token
+
+#### list_pull_requests
+List pull requests in a repository
+```typescript
+{
+  owner: string;    // Required
+  repo: string;     // Required
+  state?: "open" | "closed" | "all";
+}
 ```
 
-You can obtain this token using Clerk's frontend SDKs or the Clerk API.
-
-### Endpoints
-
-#### Pull Requests
-
-- POST `/api/v1/pull-requests/create`
-  - Create a new PR
-  - Body:
-    ```json
-    {
-      "owner": "string",
-      "repo": "string",
-      "title": "string",
-      "head": "string",
-      "base": "string",
-      "overview": "string",
-      "keyChanges": ["string"],
-      "codeHighlights": ["string"],
-      "testing": ["string"],
-      "links": [{"title": "string", "url": "string"}],
-      "additionalNotes": "string",
-      "issueIds": ["string"]
-    }
-    ```
-
-- GET `/api/v1/pull-requests/list`
-  - List PRs
-  - Query params: `owner`, `repo`, `state`
-
-- PATCH `/api/v1/pull-requests/:pullNumber`
-  - Update PR
-  - Body: `{ owner, repo, title?, body?, state? }`
-
-#### Usage & Billing
-
-- GET `/api/v1/usage/metrics`
-  - Get usage metrics for current user
-
-- GET `/api/v1/usage/billing`
-  - Get billing information
-
-## AWS Infrastructure
-
-The service uses the following AWS services:
-
-- API Gateway: REST API endpoints
-- Lambda: Serverless functions
-- DynamoDB: User data, usage tracking
-- CloudWatch: Monitoring and logging
-- IAM: Access management
-- S3: Static assets and backups
+#### update_pull_request
+Update an existing pull request
+```typescript
+{
+  owner: string;       // Required
+  repo: string;       // Required
+  pull_number: number; // Required
+  title?: string;
+  body?: string;
+  state?: "open" | "closed";
+}
+```
 
 ## Development
 
@@ -178,44 +284,18 @@ The service uses the following AWS services:
 
 ```
 src/
-├── api/
-│   ├── middleware/
-│   │   ├── auth.ts
-│   │   └── usage.ts
-│   ├── routes/
-│   │   ├── auth.ts
-│   │   ├── pullRequests.ts
-│   │   └── usage.ts
-│   └── index.ts
-├── config/
-│   └── index.ts
-└── types/
-    └── index.ts
+├── index.ts           # Main MCP server implementation
+├── api/              # API routes and middleware
+├── config/           # Configuration
+└── types/            # TypeScript type definitions
 ```
 
 ### Adding New Features
 
 1. Define types in `src/types/index.ts`
-2. Add configuration in `src/config/index.ts`
-3. Create new routes in `src/api/routes/`
-4. Update tests and documentation
-
-## Deployment
-
-1. Set up AWS infrastructure using Terraform:
-   ```bash
-   cd terraform
-   terraform init
-   terraform plan
-   terraform apply
-   ```
-
-2. Configure CI/CD pipeline (GitHub Actions example provided)
-
-3. Deploy to production:
-   ```bash
-   npm run deploy:prod
-   ```
+2. Update server implementation in `src/index.ts`
+3. Add new tool handlers in the GitHubServer class
+4. Update documentation
 
 ## Contributing
 
