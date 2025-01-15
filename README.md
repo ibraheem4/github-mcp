@@ -1,6 +1,15 @@
 # GitHub PR MCP Server
 
-An enhanced GitHub Pull Request management server built on the Model Context Protocol (MCP). This server extends the base @modelcontextprotocol/server-github functionality with rich PR creation features.
+An enhanced GitHub Pull Request management server built on the Model Context Protocol (MCP). This server extends the base @modelcontextprotocol/server-github functionality with rich PR creation features, providing a more structured and comprehensive pull request workflow.
+
+## Overview
+
+This MCP server enhances GitHub pull request management by providing:
+- Structured PR templates with predefined sections
+- Rich media attachment support
+- Automated quality checklists
+- Advanced issue linking and tracking
+- Seamless integration with existing GitHub workflows
 
 ## Features
 
@@ -297,13 +306,70 @@ src/
 3. Add new tool handlers in the GitHubServer class
 4. Update documentation
 
+## Development Setup
+
+### Prerequisites
+- Node.js 18+
+- npm or yarn
+- Git
+- GitHub account with personal access token
+
+### Local Development
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Start development server:
+```bash
+npm run dev
+```
+
+3. Run tests:
+```bash
+npm test
+```
+
+### Testing
+- Unit tests: `npm run test:unit`
+- Integration tests: `npm run test:integration`
+- Test coverage: `npm run test:coverage`
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Authentication Errors**
+   - Verify your GitHub token has the required permissions
+   - Ensure the token is correctly set in your environment
+   - Check token expiration date
+
+2. **Build Issues**
+   - Clear the build directory: `rm -rf build/`
+   - Delete node_modules and reinstall: `rm -rf node_modules && npm install`
+   - Verify TypeScript version compatibility
+
+3. **Runtime Errors**
+   - Check logs for detailed error messages
+   - Verify all required environment variables are set
+   - Ensure compatible Node.js version
+
+### Debug Mode
+
+Enable debug logging by setting:
+```bash
+DEBUG=github-pr-mcp:* npm run dev
+```
+
 ## Contributing
 
 1. Fork the repository
-2. Create a feature branch
-3. Commit your changes
-4. Push to the branch
-5. Create a Pull Request
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Run tests (`npm test`)
+5. Commit your changes (`git commit -m 'feat: add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Create a Pull Request
 
 ## License
 
