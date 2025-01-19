@@ -1,6 +1,11 @@
 import express from "express";
 import { Octokit } from "@octokit/rest";
 import { config } from "../../config/index.js";
+import { LinearClient } from "@linear/sdk";
+
+const linearClient = new LinearClient({
+  apiKey: config.linear.apiKey,
+});
 
 export const router = express.Router();
 
@@ -20,36 +25,6 @@ interface CreatePRBody {
   issueIds?: string[];
 }
 
-const getDiffContent = async (
-  owner: string,
-  repo: string,
-  pullNumber: number
-) => {
-  const octokit = new Octokit({
-    auth: config.github.privateKey,
-  });
-
-  const { data: comparison } = await octokit.repos.compareCommits({
-    owner,
-    repo,
-    base: "main",
-    head: "dev",
-  });
-
-  return (
-    comparison.files?.map((file) => ({
-      file: file.filename,
-      additions: file.additions,
-      deletions: file.deletions,
-      changes:
-        file.patch
-          ?.split("\n")
-          .filter((line) => line.startsWith("+") && !line.startsWith("+++"))
-          .map((line) => line.substring(1)) || [],
-    })) || []
-  );
-};
-
 const formatPRDescription = async (
   owner: string,
   repo: string,
@@ -58,28 +33,46 @@ const formatPRDescription = async (
 ): Promise<string> => {
   const template = `## Overview
 
-Provide a high-level summary of the purpose of this PR. Mention the problem it solves or the feature it introduces.
+${
+  data.overview ||
+  "Provide a high-level summary of the purpose of this PR. What problem does it solve or what feature does it add?"
+}
 
 ## Key Changes
 
 ${
   data.keyChanges?.map((change) => `- ${change}`).join("\n") ||
-  "Summarize the important changes made in this PR. Use bullet points for clarity."
+  "List the specific changes made in this PR:"
 }
+
+_Example:_
+- Implemented new authentication flow
+- Added form validation
+- Updated API endpoints
 
 ## Code Highlights
 
 ${
   data.codeHighlights?.map((highlight) => `- ${highlight}`).join("\n") ||
-  "Mention specific code changes or configurations that are worth noting. This helps reviewers focus on critical areas."
+  "Highlight important code changes that reviewers should focus on:"
 }
+
+_Example:_
+- New middleware implementation in \`auth.ts\`
+- Updated database schema in \`models/user.ts\`
+- Added validation logic in \`utils/validate.ts\`
 
 ## Testing
 
 ${
   data.testing?.map((test) => `- ${test}`).join("\n") ||
-  "Describe how the changes were tested and any relevant test results. Ensure the PR includes all necessary tests and indicate the environment where tests were performed."
+  "Describe how these changes were tested:"
 }
+
+_Example:_
+- Added unit tests for auth flow
+- Tested form validation with various inputs
+- Verified API responses in staging environment
 
 ## Checklist
 
@@ -87,11 +80,11 @@ ${
 - [ ] All tests passing
 - [ ] Documentation updated (if applicable)
 - [ ] Tested in staging environment
-- [ ] Includes relevant screenshots, diagrams, or videos demonstrating the change
+- [ ] Screenshots/recordings added for UI changes
 
 ## Links
 
-- [Staging Environment preview](https://app-staging.getarchitecthealth.com/)${
+- [Staging Environment](https://app-staging.getarchitecthealth.com/)${
     data.links?.length
       ? "\n" +
         data.links.map((link) => `- [${link.title}](${link.url})`).join("\n")
@@ -100,23 +93,23 @@ ${
 
 ## Attachments
 
-<!-- Screenshots will be added during review if needed -->
+<!-- Add screenshots, videos, or diagrams that help explain the changes -->
 
 ## Additional Notes
 
 ${
   data.additionalNotes ||
-  "Add any additional information that the reviewer might need to know. Mention pending tasks or technical debt, if any."
+  "Include any additional context, technical debt notes, or follow-up tasks."
 }
 
 ---
 
-### Linear Issue Tagging
-
 ${
   data.issueIds?.length
-    ? data.issueIds.map((id) => `fixes ${id}`).join("\n")
-    : "**Format:** Use `fixes {LINEAR_ISSUE_ID}` or `closes {LINEAR_ISSUE_ID}` to automatically link and close issues on Linear when the PR is merged."
+    ? `## Linear Tickets
+
+${data.issueIds.map((id) => `- fixes ${id}`).join("\n")}`
+    : ""
 }`;
 
   return template;
