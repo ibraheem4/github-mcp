@@ -1,9 +1,13 @@
 import { Octokit } from "@octokit/rest";
-import { config } from "../config/index.js";
 import { FileChange, PullRequestChange } from "../types/index.js";
 
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
+if (!GITHUB_TOKEN) {
+  throw new Error("GITHUB_TOKEN environment variable is required");
+}
+
 const octokit = new Octokit({
-  auth: config.github.privateKey,
+  auth: GITHUB_TOKEN,
 });
 
 export async function createBranch(
@@ -28,6 +32,40 @@ export async function createBranch(
   });
 }
 
+export async function getExistingPR(
+  owner: string,
+  repo: string,
+  head: string,
+  base: string
+) {
+  const { data: prs } = await octokit.pulls.list({
+    owner,
+    repo,
+    state: "open",
+    head: `${owner}:${head}`,
+    base,
+  });
+  return prs[0];
+}
+
+export async function updatePR(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  params: {
+    title?: string;
+    body?: string;
+  }
+) {
+  const { data: pr } = await octokit.pulls.update({
+    owner,
+    repo,
+    pull_number: prNumber,
+    ...params,
+  });
+  return pr;
+}
+
 export async function createPR(params: {
   owner: string;
   repo: string;
@@ -43,6 +81,31 @@ export async function createPR(params: {
   });
 
   return pr;
+}
+
+async function getPRDetails(owner: string, repo: string, number: number) {
+  const { data: pr } = await octokit.pulls.get({
+    owner,
+    repo,
+    pull_number: number,
+  });
+
+  // Get PR body to check for referenced issues
+  const bodyMatches = pr.body?.match(/\b([A-Z]+-\d+)\b/g) || [];
+  const titleMatches = pr.title.match(/\b([A-Z]+-\d+)\b/g) || [];
+
+  // Combine and deduplicate Linear issues
+  const linearIssues = [...new Set([...titleMatches, ...bodyMatches])];
+
+  return {
+    number: pr.number,
+    title: pr.title,
+    url: pr.html_url,
+    mergedAt: pr.merged_at!,
+    author: pr.user?.login || "unknown",
+    body: pr.body || "",
+    linearIssues,
+  };
 }
 
 export async function getMergedPRs(
@@ -78,13 +141,12 @@ export async function getMergedPRs(
     );
   });
 
-  return mergedPRs.map((pr) => ({
-    number: pr.number,
-    title: pr.title,
-    url: pr.html_url,
-    mergedAt: pr.merged_at!,
-    author: pr.user?.login || "unknown",
-  }));
+  // Get detailed information for each PR including referenced Linear issues
+  const prDetails = await Promise.all(
+    mergedPRs.map((pr) => getPRDetails(owner, repo, pr.number))
+  );
+
+  return prDetails;
 }
 
 export async function analyzeChanges(

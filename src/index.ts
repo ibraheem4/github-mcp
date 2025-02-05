@@ -7,7 +7,13 @@ import {
   ListToolsRequestSchema,
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
-import { createBranch, createPR, analyzeChanges } from "./utils/github.js";
+import {
+  createBranch,
+  createPR,
+  analyzeChanges,
+  getExistingPR,
+  updatePR,
+} from "./utils/github.js";
 import {
   getLinearIssue,
   generateFeaturePRDescription,
@@ -183,17 +189,36 @@ class GitHubServer {
               head
             );
 
-            // Create PR
-            const pr = await createPR({
-              owner: args.owner,
-              repo: args.repo,
-              title:
-                args.title ||
-                `release: ${new Date().toISOString().split("T")[0]}`,
-              body: generateReleasePRDescription(changes.prs),
+            // Check for existing PR
+            const existingPR = await getExistingPR(
+              args.owner,
+              args.repo,
               head,
-              base,
-            });
+              base
+            );
+
+            let pr;
+            if (existingPR) {
+              // Update existing PR
+              pr = await updatePR(args.owner, args.repo, existingPR.number, {
+                title:
+                  args.title ||
+                  `release: ${new Date().toISOString().split("T")[0]}`,
+                body: generateReleasePRDescription(changes.prs),
+              });
+            } else {
+              // Create new PR
+              pr = await createPR({
+                owner: args.owner,
+                repo: args.repo,
+                title:
+                  args.title ||
+                  `release: ${new Date().toISOString().split("T")[0]}`,
+                body: generateReleasePRDescription(changes.prs),
+                head,
+                base,
+              });
+            }
 
             return {
               content: [

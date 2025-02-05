@@ -52,4 +52,6 @@ export interface PullRequestChange {
   url: string;
   mergedAt: string;
   author: string;
+  body: string;
+  linearIssues: string[];
 }
