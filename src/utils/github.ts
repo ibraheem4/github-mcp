@@ -1,5 +1,20 @@
 import { Octokit } from "@octokit/rest";
 import { FileChange, PullRequestChange } from "../types/index.js";
+import { LinearIssue, LinearAttachment } from "../types/linear.js";
+
+interface PRTemplateSection {
+  name: string;
+  content: string;
+}
+
+interface FormattedPRBody {
+  overview: string;
+  keyChanges: string[];
+  codeHighlights: string[];
+  testing: string[];
+  links: string[];
+  attachments: string[];
+}
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 if (!GITHUB_TOKEN) {
@@ -66,6 +81,112 @@ export async function updatePR(
   return pr;
 }
 
+async function getPRTemplate(
+  owner: string,
+  repo: string
+): Promise<string | null> {
+  try {
+    // Try to get the pull request template from different common locations
+    const templatePaths = [
+      ".github/pull_request_template.md",
+      ".github/PULL_REQUEST_TEMPLATE.md",
+      "docs/pull_request_template.md",
+      "PULL_REQUEST_TEMPLATE.md",
+    ];
+
+    for (const path of templatePaths) {
+      try {
+        const { data } = await octokit.repos.getContent({
+          owner,
+          repo,
+          path,
+        });
+
+        if ("content" in data) {
+          return Buffer.from(data.content, "base64").toString();
+        }
+      } catch (error) {
+        continue; // Try next path if this one fails
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error("Error fetching PR template:", error);
+    return null;
+  }
+}
+
+function formatLinearIssueForPR(issue: LinearIssue): FormattedPRBody {
+  const formatted: FormattedPRBody = {
+    overview: issue.description || "",
+    keyChanges: [],
+    codeHighlights: [],
+    testing: [],
+    links: [`[Linear Issue ${issue.id}](${issue.url})`],
+    attachments: [],
+  };
+
+  // Extract key changes from description using bullet points
+  const bulletPoints = issue.description?.match(/[-*]\s+([^\n]+)/g) || [];
+  formatted.keyChanges = bulletPoints.map((point: string) => point.trim());
+
+  // Add any attachments/images from Linear
+  if (issue.attachments?.length) {
+    formatted.attachments = issue.attachments.map(
+      (img: LinearAttachment) =>
+        `<img width="758" alt="${img.title || "Screenshot"}" src="${img.url}">`
+    );
+  }
+
+  return formatted;
+}
+
+function fillPRTemplate(template: string, formatted: FormattedPRBody): string {
+  let filledTemplate = template;
+
+  // Fill Overview section
+  filledTemplate = filledTemplate.replace(
+    /## Overview.*?(?=## |$)/s,
+    `## Overview\n\n${formatted.overview}\n\n`
+  );
+
+  // Fill Key Changes section
+  const keyChangesContent = formatted.keyChanges.length
+    ? formatted.keyChanges.map((change) => `- ${change}`).join("\n")
+    : "- Initial implementation";
+  filledTemplate = filledTemplate.replace(
+    /## Key Changes.*?(?=## |$)/s,
+    `## Key Changes\n\n${keyChangesContent}\n\n`
+  );
+
+  // Fill Testing section
+  const testingContent = formatted.testing.length
+    ? formatted.testing.join("\n")
+    : "- [ ] Tested locally\n- [ ] Unit tests added/updated\n- [ ] Integration tests added/updated";
+  filledTemplate = filledTemplate.replace(
+    /## Testing.*?(?=## |$)/s,
+    `## Testing\n\n${testingContent}\n\n`
+  );
+
+  // Fill Links section
+  const linksContent = formatted.links.join("\n");
+  filledTemplate = filledTemplate.replace(
+    /## Links.*?(?=## |$)/s,
+    `## Links\n\n${linksContent}\n\n`
+  );
+
+  // Fill Attachments section
+  if (formatted.attachments.length) {
+    const attachmentsContent = formatted.attachments.join("\n");
+    filledTemplate = filledTemplate.replace(
+      /## Attachments.*?(?=## |$)/s,
+      `## Attachments\n\n${attachmentsContent}\n\n`
+    );
+  }
+
+  return filledTemplate;
+}
+
 export async function createPR(params: {
   owner: string;
   repo: string;
@@ -74,9 +195,22 @@ export async function createPR(params: {
   head: string;
   base: string;
   draft?: boolean;
+  linearIssue?: LinearIssue;
 }) {
+  let body = params.body;
+
+  // If we have a Linear issue and no specific body provided, try to use PR template
+  if (params.linearIssue && !params.body) {
+    const template = await getPRTemplate(params.owner, params.repo);
+    if (template) {
+      const formatted = formatLinearIssueForPR(params.linearIssue);
+      body = fillPRTemplate(template, formatted);
+    }
+  }
+
   const { data: pr } = await octokit.pulls.create({
     ...params,
+    body,
     maintainer_can_modify: true,
   });
 
