@@ -11,7 +11,7 @@
     "build"
   ],
   "scripts": {
-    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "build": "tsc && node --input-type=module -e \"import { chmod } from 'fs/promises'; await chmod('build/index.js', '755');\"",
     "prepare": "npm run build",
     "watch": "tsc --watch",
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",
@@ -19,17 +19,14 @@
     "start": "node build/api/index.js"
   },
   "dependencies": {
-    "@clerk/clerk-sdk-node": "5.1.6",
     "@linear/sdk": "37.0.0",
     "@modelcontextprotocol/sdk": "0.6.0",
     "@octokit/auth-token": "5.1.1",
     "@octokit/rest": "21.1.0",
-    "aws-sdk": "^2.1560.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
-    "helmet": "^7.1.0",
-    "stripe": "^14.17.0"
+    "helmet": "^7.1.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

@@ -1,12 +1,9 @@
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import { ClerkExpressWithAuth } from "@clerk/clerk-sdk-node";
 import rateLimit from "express-rate-limit";
 import { config } from "../config/index.js";
-import { trackUsage } from "./middleware/usage.js";
 import * as pullRequestRoutes from "./routes/pullRequests.js";
-import * as usageRoutes from "./routes/usage.js";
 
 const app = express();
 
@@ -22,12 +19,8 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
-// Clerk authentication middleware
-app.use(ClerkExpressWithAuth());
-
-// Routes with authentication and usage tracking
-app.use("/api/v1/pull-requests", trackUsage, pullRequestRoutes.router);
-app.use("/api/v1/usage", trackUsage, usageRoutes.router);
+// Routes
+app.use("/api/v1/pull-requests", pullRequestRoutes.router);
 
 // Health check endpoint
 app.get("/health", (req, res) => {

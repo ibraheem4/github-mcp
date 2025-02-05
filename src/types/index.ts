@@ -1,33 +1,3 @@
-import { Request } from "express";
-import { ClerkRequest } from "@clerk/clerk-sdk-node";
-
-export type Tier = "free" | "developer" | "team" | "enterprise";
-
-// Extend Express Request with Clerk types
-declare global {
-  namespace Express {
-    interface Request extends ClerkRequest {}
-  }
-}
-
-export interface UsageRecord {
-  userId: string;
-  timestamp: number;
-  endpoint: string;
-  tier: string;
-  operation: string;
-}
-
-export interface BillingRecord {
-  userId: string;
-  tier: string;
-  status: "active" | "inactive" | "past_due";
-  currentPeriodEnd: number;
-  cancelAtPeriodEnd: boolean;
-  stripeCustomerId: string;
-  stripeSubscriptionId: string;
-}
-
 // API Request Types
 export interface CreatePRBody {
   owner: string;
@@ -45,6 +15,23 @@ export interface CreatePRBody {
   issueIds?: string[];
 }
 
+export interface CreateFeaturePrInput {
+  owner: string;
+  repo: string;
+  linearIssueId: string;
+  base?: string;
+  title?: string;
+  description?: string;
+}
+
+export interface CreateReleasePrInput {
+  owner: string;
+  repo: string;
+  head?: string;
+  base?: string;
+  title?: string;
+}
+
 // API Response Types
 export interface APIResponse<T> {
   status: "success" | "error";
@@ -53,26 +40,16 @@ export interface APIResponse<T> {
   error?: string;
 }
 
-export interface UsageMetrics {
-  currentUsage: number;
-  usageLimit: number;
-  remainingUsage: number;
-  usageByEndpoint: { [key: string]: number };
-  monthlyHistory: { [key: string]: number };
-  tier: string;
+export interface FileChange {
+  filePath: string;
+  additions: number;
+  deletions: number;
 }
 
-export interface UserProfile {
-  userId: string;
-  email: string;
-  tier: string;
-  metadata?: Record<string, any>;
+export interface PullRequestChange {
+  number: number;
+  title: string;
+  url: string;
+  mergedAt: string;
+  author: string;
 }
-
-// Constants
-export const TIER_LIMITS: Record<Tier, number> = {
-  free: 50,
-  developer: 500,
-  team: 2000,
-  enterprise: Infinity,
-};
