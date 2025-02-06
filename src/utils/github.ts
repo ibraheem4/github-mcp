@@ -1,5 +1,10 @@
 import { Octokit } from "@octokit/rest";
-import { FileChange, PullRequestChange } from "../types/index.js";
+import {
+  FileChange,
+  PullRequestChange,
+  BranchDiff,
+  DiffAnalysis,
+} from "../types/index.js";
 import { LinearIssue, LinearAttachment } from "../types/linear.js";
 
 interface PRTemplateSection {
@@ -313,4 +318,101 @@ export async function analyzeChanges(
     files,
     prs,
   };
+}
+
+export async function getBranchDiff(
+  owner: string,
+  repo: string,
+  base: string,
+  head: string
+): Promise<BranchDiff> {
+  const { files } = await analyzeChanges(owner, repo, base, head);
+
+  const totalAdditions = files.reduce((sum, file) => sum + file.additions, 0);
+  const totalDeletions = files.reduce((sum, file) => sum + file.deletions, 0);
+
+  // Group files by directory for better analysis
+  const filesByDir = files.reduce((acc, file) => {
+    const dir = file.filePath.split("/")[0];
+    if (!acc[dir]) acc[dir] = [];
+    acc[dir].push(file);
+    return acc;
+  }, {} as Record<string, FileChange[]>);
+
+  // Generate summary based on changes
+  const dirChanges = Object.entries(filesByDir).map(([dir, files]) => {
+    const adds = files.reduce((sum, f) => sum + f.additions, 0);
+    const dels = files.reduce((sum, f) => sum + f.deletions, 0);
+    return `${dir} (${files.length} files, +${adds} -${dels})`;
+  });
+
+  const analysis: DiffAnalysis = {
+    changedFiles: files,
+    totalAdditions,
+    totalDeletions,
+    summary: `Changed ${files.length} files across ${
+      Object.keys(filesByDir).length
+    } directories: ${dirChanges.join(", ")}`,
+  };
+
+  return {
+    files,
+    analysis,
+  };
+}
+
+export function generatePRTitle(
+  diff: BranchDiff,
+  prs: PullRequestChange[]
+): string {
+  // Analyze PR types (feat, fix, etc.)
+  const prTypes = prs.reduce((acc: Record<string, number>, pr) => {
+    const type = pr.title
+      .split(":")[0]
+      .replace(/^\[.*\]\s*/, "")
+      .trim();
+    acc[type] = (acc[type] || 0) + 1;
+    return acc;
+  }, {});
+
+  const mainTypes = Object.entries(prTypes)
+    .sort(([, a], [, b]) => (b as number) - (a as number))
+    .map(([type]) => type);
+
+  // Get main components changed
+  const { analysis } = diff;
+  const mainDirs = Object.entries(
+    analysis.changedFiles.reduce(
+      (acc: Record<string, number>, file: FileChange) => {
+        const dir = file.filePath.split("/")[0];
+        if (!acc[dir]) acc[dir] = 0;
+        acc[dir]++;
+        return acc;
+      },
+      {} as Record<string, number>
+    )
+  )
+    .sort(([, a], [, b]) => (b as number) - (a as number))
+    .slice(0, 2)
+    .map(([dir]) => dir);
+
+  // Generate descriptive title based on PR content
+  const typeStr = mainTypes.length > 0 ? mainTypes.join("/") : "chore";
+
+  // Extract key changes from PR titles
+  const prSummaries = prs.map((pr) => {
+    const [, ...summary] = pr.title.split(":").map((s) => s.trim());
+    return summary
+      .join(":")
+      .replace(/^\[.*\]\s*/, "")
+      .replace(/:+$/, "");
+  });
+
+  // Use the most significant PR summary or fallback to components
+  const summary =
+    prSummaries.length > 0
+      ? prSummaries[0]
+      : `update ${mainDirs.join(" and ")} components`;
+
+  return `release: ${typeStr} ${summary}`;
 }

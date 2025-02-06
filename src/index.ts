@@ -13,6 +13,8 @@ import {
   analyzeChanges,
   getExistingPR,
   updatePR,
+  getBranchDiff,
+  generatePRTitle,
 } from "./utils/github.js";
 import {
   getLinearIssue,
@@ -181,13 +183,12 @@ class GitHubServer {
             const head = args.head || "dev";
             const base = args.base || "main";
 
-            // Analyze changes between branches
-            const changes = await analyzeChanges(
-              args.owner,
-              args.repo,
-              base,
-              head
-            );
+            // Get diff analysis and changes
+            const [diff, changes] = await Promise.all([
+              getBranchDiff(args.owner, args.repo, base, head),
+              analyzeChanges(args.owner, args.repo, base, head),
+            ]);
+            const title = args.title || generatePRTitle(diff, changes.prs);
 
             // Check for existing PR
             const existingPR = await getExistingPR(
@@ -201,9 +202,7 @@ class GitHubServer {
             if (existingPR) {
               // Update existing PR
               pr = await updatePR(args.owner, args.repo, existingPR.number, {
-                title:
-                  args.title ||
-                  `release: ${new Date().toISOString().split("T")[0]}`,
+                title,
                 body: generateReleasePRDescription(changes.prs),
               });
             } else {
@@ -211,9 +210,7 @@ class GitHubServer {
               pr = await createPR({
                 owner: args.owner,
                 repo: args.repo,
-                title:
-                  args.title ||
-                  `release: ${new Date().toISOString().split("T")[0]}`,
+                title,
                 body: generateReleasePRDescription(changes.prs),
                 head,
                 base,

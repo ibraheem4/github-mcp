@@ -30,6 +30,19 @@ export interface CreateReleasePrInput {
   head?: string;
   base?: string;
   title?: string;
+  generateTitle?: boolean;
+}
+
+export interface DiffAnalysis {
+  changedFiles: FileChange[];
+  totalAdditions: number;
+  totalDeletions: number;
+  summary: string;
+}
+
+export interface BranchDiff {
+  files: FileChange[];
+  analysis: DiffAnalysis;
 }
 
 // API Response Types
