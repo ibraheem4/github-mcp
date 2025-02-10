@@ -42,6 +42,7 @@ class GitHubServer {
           tools: {
             create_feature_pr: {},
             create_release_pr: {},
+            update_pr: {},
           },
         },
       }
@@ -122,6 +123,36 @@ class GitHubServer {
               },
             },
             required: ["owner", "repo"],
+          },
+        },
+        {
+          name: "update_pr",
+          description: "Update an existing pull request",
+          inputSchema: {
+            type: "object",
+            properties: {
+              owner: {
+                type: "string",
+                description: "Repository owner",
+              },
+              repo: {
+                type: "string",
+                description: "Repository name",
+              },
+              prNumber: {
+                type: "number",
+                description: "Pull request number",
+              },
+              title: {
+                type: "string",
+                description: "New PR title",
+              },
+              description: {
+                type: "string",
+                description: "New PR description in markdown format",
+              },
+            },
+            required: ["owner", "repo", "prNumber"],
           },
         },
       ],
@@ -229,6 +260,39 @@ class GitHubServer {
                         files: changes.files.length,
                         prs: changes.prs.length,
                       },
+                    },
+                    null,
+                    2
+                  ),
+                },
+              ],
+            };
+          }
+
+          case "update_pr": {
+            const args = request.params.arguments as {
+              owner: string;
+              repo: string;
+              prNumber: number;
+              title?: string;
+              description?: string;
+            };
+
+            const pr = await updatePR(args.owner, args.repo, args.prNumber, {
+              title: args.title,
+              body: args.description,
+            });
+
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(
+                    {
+                      url: pr.html_url,
+                      number: pr.number,
+                      title: pr.title,
+                      updated: true,
                     },
                     null,
                     2
