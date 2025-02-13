@@ -2,6 +2,11 @@ import express from "express";
 import { Octokit } from "@octokit/rest";
 import { config } from "../../config/index.js";
 import { LinearClient } from "@linear/sdk";
+import {
+  analyzeChanges,
+  getBranchDiff,
+  generatePRTitle,
+} from "../../utils/github.js";
 
 const linearClient = new LinearClient({
   apiKey: config.linear.apiKey,
@@ -115,6 +120,70 @@ ${data.issueIds.map((id) => `- fixes ${id}`).join("\n")}`
   return template;
 };
 
+const formatReleasePRDescription = async (
+  owner: string,
+  repo: string,
+  base: string,
+  head: string
+): Promise<string> => {
+  // Get branch diff and merged PRs
+  const { files, prs } = await analyzeChanges(owner, repo, base, head);
+  const branchDiff = await getBranchDiff(owner, repo, base, head);
+
+  // Group PRs by type
+  const prsByType: Record<string, string[]> = {};
+  prs.forEach((pr) => {
+    const type = pr.title.split(":")[0].trim().toLowerCase();
+    if (!prsByType[type]) prsByType[type] = [];
+    prsByType[type].push(`- ${pr.title} (#${pr.number})`);
+  });
+
+  // Format PR description
+  const description = `# Release: ${head} → ${base}
+
+## 📊 Change Summary
+${branchDiff.analysis.summary}
+
+## 🔄 Changes by Type
+${Object.entries(prsByType)
+  .map(
+    ([type, prs]) => `
+### ${type.charAt(0).toUpperCase() + type.slice(1)}
+${prs.join("\n")}`
+  )
+  .join("\n")}
+
+## 📈 Statistics
+- Total Files Changed: ${files.length}
+- Lines Added: +${branchDiff.analysis.totalAdditions}
+- Lines Removed: -${branchDiff.analysis.totalDeletions}
+
+## 🔍 Changed Files by Directory
+${Object.entries(
+  files.reduce((acc: Record<string, number>, file) => {
+    const dir = file.filePath.split("/")[0];
+    acc[dir] = (acc[dir] || 0) + 1;
+    return acc;
+  }, {})
+)
+  .map(([dir, count]) => `- ${dir}: ${count} files`)
+  .join("\n")}
+
+## ✅ Pre-Release Checklist
+- [ ] All tests passing
+- [ ] Code reviewed
+- [ ] Documentation updated
+- [ ] No breaking changes
+- [ ] Staging environment verified
+
+## 🔗 Related
+- Frontend Release PR: ${repo.includes("frontend") ? "" : "#30"}
+- Backend Release PR: ${repo.includes("backend") ? "" : "#39"}
+`;
+
+  return description;
+};
+
 // Create a new PR
 router.post("/create", async (req, res) => {
   try {
@@ -206,7 +275,6 @@ router.patch("/:pullNumber", async (req, res) => {
       auth: config.github.privateKey,
     });
 
-    // If no body provided, generate one from diff
     // Get PR details to get head and base
     const { data: prDetails } = await octokit.pulls.get({
       owner,
@@ -214,21 +282,47 @@ router.patch("/:pullNumber", async (req, res) => {
       pull_number: pullNumber,
     });
 
-    const description =
-      body ||
-      (await formatPRDescription(owner, repo, pullNumber, {
-        owner,
-        repo,
-        title,
-        head: prDetails.head.ref,
-        base: prDetails.base.ref,
-      }));
+    // For release PRs (dev to main), use special formatting
+    const isReleasePR =
+      prDetails.base.ref === "main" && prDetails.head.ref === "dev";
+    const description = isReleasePR
+      ? await formatReleasePRDescription(
+          owner,
+          repo,
+          prDetails.base.ref,
+          prDetails.head.ref
+        )
+      : body ||
+        (await formatPRDescription(owner, repo, pullNumber, {
+          owner,
+          repo,
+          title,
+          head: prDetails.head.ref,
+          base: prDetails.base.ref,
+        }));
 
     const response = await octokit.pulls.update({
       owner,
       repo,
       pull_number: pullNumber,
-      title,
+      title: isReleasePR
+        ? generatePRTitle(
+            await getBranchDiff(
+              owner,
+              repo,
+              prDetails.base.ref,
+              prDetails.head.ref
+            ),
+            (
+              await analyzeChanges(
+                owner,
+                repo,
+                prDetails.base.ref,
+                prDetails.head.ref
+              )
+            ).prs
+          )
+        : title,
       body: description,
       state,
     });
