@@ -1,11 +1,11 @@
 {
-  "name": "github-server",
-  "version": "0.1.0",
-  "description": "A Model Context Protocol server",
-  "private": true,
+  "name": "@ibraheem4/github-mcp",
+  "version": "0.1.5",
+  "description": "A GitHub Pull Request MCP server for enhanced PR management",
   "type": "module",
   "bin": {
-    "github-server": "./build/index.js"
+    "github-mcp": "build/index.js",
+    "@ibraheem4/github-mcp": "build/index.js"
   },
   "files": [
     "build"
@@ -24,6 +24,7 @@
     "@octokit/auth-token": "5.1.1",
     "@octokit/rest": "21.1.0",
     "cors": "^2.8.5",
+    "dotenv": "16.4.7",
     "express": "^4.18.2",
     "express-rate-limit": "^7.1.5",
     "helmet": "^7.1.0"
@@ -35,5 +36,24 @@
     "nodemon": "^3.0.3",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "github",
+    "mcp",
+    "model-context-protocol",
+    "pull-request",
+    "cli"
+  ],
+  "author": "Ibraheem Abdul-Malik",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ibraheem4/github-mcp"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

@@ -85,10 +85,25 @@ Link related issues here.
 
 ## Installation
 
+You can use this server in two ways:
+
+### Option 1: NPX (Recommended)
+
+Run directly using npx:
+```bash
+# Make sure GITHUB_TOKEN environment variable is set
+export GITHUB_TOKEN=your_github_personal_access_token
+npx @ibraheem4/github-mcp
+```
+
+### Option 2: Local Build
+
+For development or if you want to modify the server:
+
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/cline-github-mcp.git
-   cd cline-github-mcp
+   git clone https://github.com/ibraheem4/github-mcp.git
+   cd github-mcp
    ```
 
 2. Install dependencies:
@@ -101,14 +116,35 @@ Link related issues here.
    npm run build
    ```
 
+The build will create an executable server in the `build` directory that can be used by MCP clients.
+
 ## Environment Variables
 
-Create a `.env` file in the root directory:
+The server requires both a GitHub Personal Access Token and a Linear API Key. You can provide these in two ways:
 
+### Option 1: Environment File (for local development)
+
+Copy `.env.example` to `.env` in the project root:
+```bash
+cp .env.example .env
+```
+
+Then edit `.env` to add your tokens:
 ```env
 # Required for GitHub API access
 GITHUB_TOKEN=your_github_personal_access_token
+
+# Required for Linear API access
+LINEAR_API_KEY=your_linear_api_key
 ```
+
+### Option 2: MCP Configuration (recommended)
+
+When using the server through MCP clients (Claude Desktop, VSCode, etc.), configure the tokens in your MCP settings file as shown in the configuration examples below. This is the recommended approach as it keeps your tokens separate from the project files.
+
+To obtain the required tokens:
+1. GitHub Token: Create a personal access token at https://github.com/settings/tokens with `repo` scope
+2. Linear API Key: Generate an API key at https://linear.app/settings/api
 
 ## Usage
 
@@ -135,27 +171,43 @@ This enhanced GitHub PR server can run alongside the base GitHub server in vario
    - Windows: `%APPDATA%/Claude/claude_desktop_config.json`
    - Linux: `~/.config/Claude/claude_desktop_config.json`
 
-2. Add both servers to the configuration:
-   ```json
-   {
-     "mcpServers": {
-       "github": {
-         "command": "npx",
-         "args": ["-y", "@modelcontextprotocol/server-github"],
-         "env": {
-           "GITHUB_TOKEN": "your_github_personal_access_token"
-         }
-       },
-       "github-pr": {
-         "command": "node",
-         "args": ["/path/to/cline-github-mcp/build/index.js"],
-         "env": {
-           "GITHUB_TOKEN": "your_github_personal_access_token"
-         }
-       }
-     }
-   }
-   ```
+2. Add both servers to the configuration. You can use either the npx version or local build:
+
+    ```json
+    {
+      "mcpServers": {
+        "github-ibraheem4": {
+          "command": "npx",
+          "args": ["-y", "@modelcontextprotocol/server-github"],
+          "env": {
+            "GITHUB_TOKEN": "your_github_personal_access_token"
+          }
+        },
+        // Option 1: Using npx (Recommended)
+        "github-pr-ibraheem4": {
+          "command": "npx",
+          "args": ["-y", "@ibraheem4/github-mcp"],
+          "env": {
+            "GITHUB_TOKEN": "your_github_personal_access_token",
+            "LINEAR_API_KEY": "your_linear_api_key"
+          },
+          "disabled": false,
+          "alwaysAllow": []
+        }
+        // Option 2: Using local build
+        // "github-pr-ibraheem4": {
+        //   "command": "node",
+        //   "args": ["/path/to/github-mcp/build/index.js"],
+        //   "env": {
+        //     "GITHUB_TOKEN": "your_github_personal_access_token",
+        //     "LINEAR_API_KEY": "your_linear_api_key"
+        //   },
+        //   "disabled": false,
+        //   "alwaysAllow": []
+        // }
+      }
+    }
+    ```
 
 #### VSCode (Cline Extension)
 
@@ -164,27 +216,43 @@ This enhanced GitHub PR server can run alongside the base GitHub server in vario
    - Windows: `%APPDATA%/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
    - Linux: `~/.config/Code/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
 
-2. Add both servers to the configuration:
-   ```json
-   {
-     "mcpServers": {
-       "github": {
-         "command": "npx",
-         "args": ["-y", "@modelcontextprotocol/server-github"],
-         "env": {
-           "GITHUB_TOKEN": "your_github_personal_access_token"
-         }
-       },
-       "github-pr": {
-         "command": "node",
-         "args": ["/path/to/cline-github-mcp/build/index.js"],
-         "env": {
-           "GITHUB_TOKEN": "your_github_personal_access_token"
-         }
-       }
-     }
-   }
-   ```
+2. Add both servers to the configuration. You can use either the npx version or local build:
+
+    ```json
+    {
+      "mcpServers": {
+        "github-ibraheem4": {
+          "command": "npx",
+          "args": ["-y", "@modelcontextprotocol/server-github"],
+          "env": {
+            "GITHUB_TOKEN": "your_github_personal_access_token"
+          }
+        },
+        // Option 1: Using npx (Recommended)
+        "github-pr-ibraheem4": {
+          "command": "npx",
+          "args": ["-y", "@ibraheem4/github-mcp"],
+          "env": {
+            "GITHUB_TOKEN": "your_github_personal_access_token",
+            "LINEAR_API_KEY": "your_linear_api_key"
+          },
+          "disabled": false,
+          "alwaysAllow": []
+        }
+        // Option 2: Using local build
+        // "github-pr-ibraheem4": {
+        //   "command": "node",
+        //   "args": ["/path/to/github-mcp/build/index.js"],
+        //   "env": {
+        //     "GITHUB_TOKEN": "your_github_personal_access_token",
+        //     "LINEAR_API_KEY": "your_linear_api_key"
+        //   },
+        //   "disabled": false,
+        //   "alwaysAllow": []
+        // }
+      }
+    }
+    ```
 
 #### VSCode (Roo Cline Extension)
 
@@ -193,27 +261,41 @@ This enhanced GitHub PR server can run alongside the base GitHub server in vario
    - Windows: `%APPDATA%/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json`
    - Linux: `~/.config/Code/User/globalStorage/rooveterinaryinc.roo-cline/settings/cline_mcp_settings.json`
 
-2. Add both servers to the configuration:
-   ```json
-   {
-     "mcpServers": {
-       "github": {
-         "command": "npx",
-         "args": ["-y", "@modelcontextprotocol/server-github"],
-         "env": {
-           "GITHUB_TOKEN": "your_github_personal_access_token"
-         }
-       },
-       "github-pr": {
-         "command": "node",
-         "args": ["/path/to/cline-github-mcp/build/index.js"],
-         "env": {
-           "GITHUB_TOKEN": "your_github_personal_access_token"
-         }
-       }
-     }
-   }
-   ```
+2. Add both servers to the configuration. You can use either the npx version or local build:
+
+    ```json
+    {
+      "mcpServers": {
+        "github-ibraheem4": {
+          "command": "npx",
+          "args": ["-y", "@modelcontextprotocol/server-github"],
+          "env": {
+            "GITHUB_TOKEN": "your_github_personal_access_token"
+          }
+        },
+        // Option 1: Using npx (Recommended)
+        "github-pr-ibraheem4": {
+          "command": "npx",
+          "args": ["-y", "@ibraheem4/github-mcp"],
+          "env": {
+            "GITHUB_TOKEN": "your_github_personal_access_token"
+          },
+          "disabled": false,
+          "alwaysAllow": []
+        }
+        // Option 2: Using local build
+        // "github-pr-ibraheem4": {
+        //   "command": "node",
+        //   "args": ["/path/to/github-mcp/build/index.js"],
+        //   "env": {
+        //     "GITHUB_TOKEN": "your_github_personal_access_token"
+        //   },
+        //   "disabled": false,
+        //   "alwaysAllow": []
+        // }
+      }
+    }
+    ```
 
 3. Restart your application after making changes
 

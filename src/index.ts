@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+import { dirname, join } from "path";
+import { fileURLToPath } from "url";
+import { config } from "dotenv";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
@@ -22,6 +25,10 @@ import {
   generateReleasePRDescription,
 } from "./utils/linear.js";
 import { CreateFeaturePrInput, CreateReleasePrInput } from "./types/index.js";
+
+// Load .env file from the project root
+const __dirname = dirname(fileURLToPath(import.meta.url));
+config({ path: join(__dirname, "..", ".env") });
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 if (!GITHUB_TOKEN) {
