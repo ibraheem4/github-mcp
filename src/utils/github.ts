@@ -7,11 +7,6 @@ import {
 } from "../types/index.js";
 import { LinearIssue, LinearAttachment } from "../types/linear.js";
 
-interface PRTemplateSection {
-  name: string;
-  content: string;
-}
-
 interface FormattedPRBody {
   overview: string;
   keyChanges: string[];
@@ -415,4 +410,175 @@ export function generatePRTitle(
       : `update ${mainDirs.join(" and ")} components`;
 
   return `release: ${typeStr} ${summary}`;
+}
+
+// Basic GitHub API functions
+export async function getFileContents(
+  owner: string,
+  repo: string,
+  path: string,
+  ref?: string
+) {
+  const { data } = await octokit.repos.getContent({
+    owner,
+    repo,
+    path,
+    ref,
+  });
+  return data;
+}
+
+export async function createOrUpdateFile(params: {
+  owner: string;
+  repo: string;
+  path: string;
+  message: string;
+  content: string;
+  branch?: string;
+  sha?: string;
+}) {
+  const { data } = await octokit.repos.createOrUpdateFileContents({
+    owner: params.owner,
+    repo: params.repo,
+    path: params.path,
+    message: params.message,
+    content: Buffer.from(params.content).toString('base64'),
+    branch: params.branch,
+    sha: params.sha,
+  });
+  return data;
+}
+
+export async function listCommits(params: {
+  owner: string;
+  repo: string;
+  sha?: string;
+  path?: string;
+  page?: number;
+  perPage?: number;
+}) {
+  const { data } = await octokit.repos.listCommits({
+    owner: params.owner,
+    repo: params.repo,
+    sha: params.sha,
+    path: params.path,
+    page: params.page,
+    per_page: params.perPage || 30,
+  });
+  return data;
+}
+
+export async function getIssue(owner: string, repo: string, issue_number: number) {
+  const { data } = await octokit.issues.get({
+    owner,
+    repo,
+    issue_number,
+  });
+  return data;
+}
+
+export async function createIssue(params: {
+  owner: string;
+  repo: string;
+  title: string;
+  body?: string;
+  assignees?: string[];
+  labels?: string[];
+}) {
+  const { data } = await octokit.issues.create({
+    owner: params.owner,
+    repo: params.repo,
+    title: params.title,
+    body: params.body,
+    assignees: params.assignees,
+    labels: params.labels,
+  });
+  return data;
+}
+
+export async function listIssues(params: {
+  owner: string;
+  repo: string;
+  state?: "open" | "closed" | "all";
+  labels?: string[];
+  sort?: "created" | "updated" | "comments";
+  direction?: "asc" | "desc";
+  page?: number;
+  perPage?: number;
+}) {
+  const { data } = await octokit.issues.listForRepo({
+    owner: params.owner,
+    repo: params.repo,
+    state: params.state,
+    labels: params.labels?.join(','),
+    sort: params.sort,
+    direction: params.direction,
+    page: params.page,
+    per_page: params.perPage || 30,
+  });
+  return data;
+}
+
+export async function getPullRequest(owner: string, repo: string, pull_number: number) {
+  const { data } = await octokit.pulls.get({
+    owner,
+    repo,
+    pull_number,
+  });
+  return data;
+}
+
+export async function listPullRequests(params: {
+  owner: string;
+  repo: string;
+  state?: "open" | "closed" | "all";
+  sort?: "created" | "updated" | "popularity";
+  direction?: "asc" | "desc";
+  page?: number;
+  perPage?: number;
+}) {
+  const { data } = await octokit.pulls.list({
+    owner: params.owner,
+    repo: params.repo,
+    state: params.state,
+    sort: params.sort,
+    direction: params.direction,
+    page: params.page,
+    per_page: params.perPage || 30,
+  });
+  return data;
+}
+
+export async function searchCode(params: {
+  query: string;
+  sort?: "indexed";
+  order?: "asc" | "desc";
+  page?: number;
+  perPage?: number;
+}) {
+  const { data } = await octokit.search.code({
+    q: params.query,
+    sort: params.sort,
+    order: params.order,
+    page: params.page,
+    per_page: params.perPage || 30,
+  });
+  return data;
+}
+
+export async function searchRepositories(params: {
+  query: string;
+  sort?: "stars" | "forks" | "help-wanted-issues" | "updated";
+  order?: "asc" | "desc";
+  page?: number;
+  perPage?: number;
+}) {
+  const { data } = await octokit.search.repos({
+    q: params.query,
+    sort: params.sort,
+    order: params.order,
+    page: params.page,
+    per_page: params.perPage || 30,
+  });
+  return data;
 }
