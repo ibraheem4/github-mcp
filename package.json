@@ -16,7 +16,10 @@
     "watch": "tsc --watch",
     "inspector": "npx @modelcontextprotocol/inspector build/index.js",
     "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/api/index.ts",
-    "start": "node build/api/index.js"
+    "start": "node build/api/index.js",
+    "publish:patch": "npm version patch && npm publish",
+    "publish:minor": "npm version minor && npm publish",
+    "publish:major": "npm version major && npm publish"
   },
   "dependencies": {
     "@linear/sdk": "37.0.0",
