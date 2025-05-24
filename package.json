@@ -1,6 +1,6 @@
 {
   "name": "@ibraheem4/github-mcp",
-  "version": "0.2.3",
+  "version": "3.0.1",
   "description": "A GitHub Pull Request MCP server for enhanced PR management",
   "type": "module",
   "bin": {
