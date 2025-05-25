@@ -18,23 +18,31 @@ import {
   updatePR,
   getBranchDiff,
   generatePRTitle,
-  getFileContents,
-  createOrUpdateFile,
-  listCommits,
-  getIssue,
-  createIssue,
-  listIssues,
-  getPullRequest,
-  listPullRequests,
-  searchCode,
-  searchRepositories,
+  getGitHubIssue,
+  listGitHubIssues,
+  createGitHubIssue,
+  updateGitHubIssue,
 } from "./utils/github.js";
 import {
   getLinearIssue,
   generateFeaturePRDescription,
   generateReleasePRDescription,
+  getLinearIssueDetails,
+  listLinearIssues,
+  createLinearIssue,
+  listLinearTeams,
+  triageIssue,
+  createHybridIssue,
+  prepareAgentReadyIssue,
+  generateMCPLabels,
+  syncCrossPlatformStatus,
 } from "./utils/linear.js";
-import { CreateFeaturePrInput, CreateReleasePrInput } from "./types/index.js";
+import { 
+  CreateFeaturePrInput, 
+  CreateReleasePrInput, 
+  IssueTriageInput,
+  CreateIssueInput,
+} from "./types/index.js";
 
 // Load .env file from the project root
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -51,27 +59,31 @@ class GitHubServer {
   constructor() {
     this.server = new Server(
       {
-        name: "github-pr",
+        name: "linear-github-bridge",
         version: "0.1.0",
       },
       {
         capabilities: {
           tools: {
-            // Existing PR tools
+            // Linear-GitHub Bridge Tools (Original)
             create_feature_pr: {},
             create_release_pr: {},
             update_pr: {},
-            // Basic GitHub API tools
-            get_file_contents: {},
-            create_or_update_file: {},
-            list_commits: {},
-            get_issue: {},
+            // Issue Triage and Management Tools
+            triage_issue: {},
             create_issue: {},
-            list_issues: {},
-            get_pull_request: {},
-            list_pull_requests: {},
-            search_code: {},
-            search_repositories: {},
+            create_hybrid_issue: {},
+            get_linear_issue: {},
+            list_linear_issues: {},
+            list_linear_teams: {},
+            get_github_issue: {},
+            list_github_issues: {},
+            update_github_issue: {},
+            sync_issue: {},
+            // Lucitra-specific MCP Tools
+            prepare_agent_ready: {},
+            generate_mcp_labels: {},
+            sync_cross_platform: {},
           },
         },
       }
@@ -184,159 +196,187 @@ class GitHubServer {
             required: ["owner", "repo", "prNumber"],
           },
         },
-        // Basic GitHub API tools
+        // === NEW ISSUE TRIAGE AND MANAGEMENT TOOLS ===
         {
-          name: "get_file_contents",
-          description: "Get contents of a file or directory from a repository",
+          name: "triage_issue",
+          description: "Analyze an issue and determine if it should go to GitHub (engineering) or Linear (business/product)",
           inputSchema: {
             type: "object",
             properties: {
-              owner: { type: "string", description: "Repository owner" },
-              repo: { type: "string", description: "Repository name" },
-              path: { type: "string", description: "File or directory path" },
-              ref: { type: "string", description: "Git reference (branch, tag, or SHA)" },
+              title: { type: "string", description: "Issue title" },
+              description: { type: "string", description: "Issue description" },
+              labels: { type: "array", items: { type: "string" }, description: "Existing labels (optional)" },
             },
-            required: ["owner", "repo", "path"],
-          },
-        },
-        {
-          name: "create_or_update_file",
-          description: "Create or update a single file in a repository",
-          inputSchema: {
-            type: "object",
-            properties: {
-              owner: { type: "string", description: "Repository owner" },
-              repo: { type: "string", description: "Repository name" },
-              path: { type: "string", description: "File path" },
-              message: { type: "string", description: "Commit message" },
-              content: { type: "string", description: "File content" },
-              branch: { type: "string", description: "Branch name" },
-              sha: { type: "string", description: "File SHA if updating existing file" },
-            },
-            required: ["owner", "repo", "path", "message", "content"],
-          },
-        },
-        {
-          name: "list_commits",
-          description: "Get a list of commits from a repository",
-          inputSchema: {
-            type: "object",
-            properties: {
-              owner: { type: "string", description: "Repository owner" },
-              repo: { type: "string", description: "Repository name" },
-              sha: { type: "string", description: "Branch name, tag, or commit SHA" },
-              path: { type: "string", description: "Only commits containing this file path" },
-              page: { type: "number", description: "Page number for pagination" },
-              perPage: { type: "number", description: "Results per page (default: 30)" },
-            },
-            required: ["owner", "repo"],
-          },
-        },
-        {
-          name: "get_issue",
-          description: "Get details of a specific issue",
-          inputSchema: {
-            type: "object",
-            properties: {
-              owner: { type: "string", description: "Repository owner" },
-              repo: { type: "string", description: "Repository name" },
-              issue_number: { type: "number", description: "Issue number" },
-            },
-            required: ["owner", "repo", "issue_number"],
+            required: ["title", "description"],
           },
         },
         {
           name: "create_issue",
-          description: "Create a new issue in a repository",
+          description: "Create an issue on GitHub or Linear based on triage decision",
           inputSchema: {
             type: "object",
             properties: {
-              owner: { type: "string", description: "Repository owner" },
-              repo: { type: "string", description: "Repository name" },
               title: { type: "string", description: "Issue title" },
-              body: { type: "string", description: "Issue body content" },
-              assignees: { type: "array", items: { type: "string" }, description: "Usernames to assign" },
+              description: { type: "string", description: "Issue description" },
+              platform: { type: "string", enum: ["github", "linear"], description: "Target platform" },
+              owner: { type: "string", description: "GitHub repo owner (required for GitHub)" },
+              repo: { type: "string", description: "GitHub repo name (required for GitHub)" },
+              teamId: { type: "string", description: "Linear team ID (required for Linear)" },
               labels: { type: "array", items: { type: "string" }, description: "Labels to apply" },
+              assignee: { type: "string", description: "Assignee username/ID" },
+              priority: { type: "number", description: "Priority (0-4, Linear only)" },
             },
-            required: ["owner", "repo", "title"],
+            required: ["title", "description", "platform"],
           },
         },
         {
-          name: "list_issues",
-          description: "List and filter repository issues",
+          name: "get_linear_issue",
+          description: "Get details of a specific Linear issue",
+          inputSchema: {
+            type: "object",
+            properties: {
+              issueId: { type: "string", description: "Linear issue ID" },
+            },
+            required: ["issueId"],
+          },
+        },
+        {
+          name: "list_linear_issues",
+          description: "List Linear issues, optionally filtered by team",
+          inputSchema: {
+            type: "object",
+            properties: {
+              teamId: { type: "string", description: "Filter by team ID (optional)" },
+              limit: { type: "number", description: "Maximum number of issues to return (default: 50)" },
+            },
+          },
+        },
+        {
+          name: "list_linear_teams",
+          description: "List all Linear teams",
+          inputSchema: {
+            type: "object",
+            properties: {},
+          },
+        },
+        {
+          name: "get_github_issue",
+          description: "Get details of a specific GitHub issue",
           inputSchema: {
             type: "object",
             properties: {
               owner: { type: "string", description: "Repository owner" },
               repo: { type: "string", description: "Repository name" },
-              state: { type: "string", enum: ["open", "closed", "all"], description: "Filter by state" },
-              labels: { type: "array", items: { type: "string" }, description: "Labels to filter by" },
-              sort: { type: "string", enum: ["created", "updated", "comments"], description: "Sort by" },
-              direction: { type: "string", enum: ["asc", "desc"], description: "Sort direction" },
-              page: { type: "number", description: "Page number" },
-              perPage: { type: "number", description: "Results per page" },
+              issueNumber: { type: "number", description: "Issue number" },
+            },
+            required: ["owner", "repo", "issueNumber"],
+          },
+        },
+        {
+          name: "list_github_issues",
+          description: "List GitHub issues in a repository",
+          inputSchema: {
+            type: "object",
+            properties: {
+              owner: { type: "string", description: "Repository owner" },
+              repo: { type: "string", description: "Repository name" },
+              state: { type: "string", enum: ["open", "closed", "all"], description: "Issue state (default: open)" },
+              limit: { type: "number", description: "Maximum number of issues to return (default: 50)" },
             },
             required: ["owner", "repo"],
           },
         },
         {
-          name: "get_pull_request",
-          description: "Get details of a specific pull request",
+          name: "update_github_issue",
+          description: "Update a GitHub issue",
           inputSchema: {
             type: "object",
             properties: {
               owner: { type: "string", description: "Repository owner" },
               repo: { type: "string", description: "Repository name" },
-              pull_number: { type: "number", description: "Pull request number" },
+              issueNumber: { type: "number", description: "Issue number" },
+              title: { type: "string", description: "New title (optional)" },
+              body: { type: "string", description: "New body/description (optional)" },
+              state: { type: "string", enum: ["open", "closed"], description: "New state (optional)" },
+              labels: { type: "array", items: { type: "string" }, description: "New labels (optional)" },
+              assignees: { type: "array", items: { type: "string" }, description: "New assignees (optional)" },
             },
-            required: ["owner", "repo", "pull_number"],
+            required: ["owner", "repo", "issueNumber"],
           },
         },
         {
-          name: "list_pull_requests",
-          description: "List and filter repository pull requests",
+          name: "sync_issue",
+          description: "Sync an issue between GitHub and Linear (create corresponding issue on other platform)",
+          inputSchema: {
+            type: "object",
+            properties: {
+              sourceplatform: { type: "string", enum: ["github", "linear"], description: "Source platform" },
+              sourceId: { type: "string", description: "Source issue ID/number" },
+              targetOwner: { type: "string", description: "Target GitHub repo owner (if syncing to GitHub)" },
+              targetRepo: { type: "string", description: "Target GitHub repo name (if syncing to GitHub)" },
+              targetTeamId: { type: "string", description: "Target Linear team ID (if syncing to Linear)" },
+              syncMode: { type: "string", enum: ["one-way", "bidirectional"], description: "Sync mode (default: one-way)" },
+            },
+            required: ["sourceplatform", "sourceId"],
+          },
+        },
+        // === LUCITRA-SPECIFIC MCP TOOLS ===
+        {
+          name: "create_hybrid_issue",
+          description: "Create coordinated issues in both GitHub (technical) and Linear (business) for complex projects",
+          inputSchema: {
+            type: "object",
+            properties: {
+              title: { type: "string", description: "Issue title" },
+              description: { type: "string", description: "Issue description" },
+              owner: { type: "string", description: "GitHub repo owner" },
+              repo: { type: "string", description: "GitHub repo name" },
+              teamId: { type: "string", description: "Linear team ID" },
+              labels: { type: "array", items: { type: "string" }, description: "Labels to apply to both issues" },
+              assignee: { type: "string", description: "Assignee username/ID" },
+              priority: { type: "number", description: "Priority (0-4, Linear only)" },
+            },
+            required: ["title", "description", "owner", "repo", "teamId"],
+          },
+        },
+        {
+          name: "prepare_agent_ready",
+          description: "Analyze a GitHub issue and prepare it for Copilot agent work",
           inputSchema: {
             type: "object",
             properties: {
               owner: { type: "string", description: "Repository owner" },
               repo: { type: "string", description: "Repository name" },
-              state: { type: "string", enum: ["open", "closed", "all"], description: "PR state" },
-              sort: { type: "string", enum: ["created", "updated", "popularity"], description: "Sort field" },
-              direction: { type: "string", enum: ["asc", "desc"], description: "Sort direction" },
-              page: { type: "number", description: "Page number" },
-              perPage: { type: "number", description: "Results per page" },
+              issueNumber: { type: "number", description: "Issue number" },
             },
-            required: ["owner", "repo"],
+            required: ["owner", "repo", "issueNumber"],
           },
         },
         {
-          name: "search_code",
-          description: "Search for code across GitHub repositories",
+          name: "generate_mcp_labels",
+          description: "Generate Lucitra-standard MCP labels for an issue",
           inputSchema: {
             type: "object",
             properties: {
-              query: { type: "string", description: "Search query" },
-              sort: { type: "string", enum: ["indexed"], description: "Sort field" },
-              order: { type: "string", enum: ["asc", "desc"], description: "Sort order" },
-              page: { type: "number", description: "Page number" },
-              perPage: { type: "number", description: "Results per page" },
+              title: { type: "string", description: "Issue title" },
+              body: { type: "string", description: "Issue body/description" },
+              platform: { type: "string", enum: ["github", "linear"], description: "Target platform" },
             },
-            required: ["query"],
+            required: ["title", "body", "platform"],
           },
         },
         {
-          name: "search_repositories",
-          description: "Search for GitHub repositories",
+          name: "sync_cross_platform",
+          description: "Check and sync status between linked GitHub and Linear issues",
           inputSchema: {
             type: "object",
             properties: {
-              query: { type: "string", description: "Search query" },
-              sort: { type: "string", enum: ["stars", "forks", "help-wanted-issues", "updated"], description: "Sort field" },
-              order: { type: "string", enum: ["asc", "desc"], description: "Sort order" },
-              page: { type: "number", description: "Page number" },
-              perPage: { type: "number", description: "Results per page" },
+              githubOwner: { type: "string", description: "GitHub repository owner" },
+              githubRepo: { type: "string", description: "GitHub repository name" },
+              githubIssueNumber: { type: "number", description: "GitHub issue number" },
+              linearIssueId: { type: "string", description: "Linear issue ID (optional)" },
             },
-            required: ["query"],
+            required: ["githubOwner", "githubRepo", "githubIssueNumber"],
           },
         },
       ],
@@ -486,147 +526,315 @@ class GitHubServer {
             };
           }
 
-          case "get_file_contents": {
-            const args = request.params.arguments as {
-              owner: string;
-              repo: string;
-              path: string;
-              ref?: string;
-            };
-            const result = await getFileContents(args.owner, args.repo, args.path, args.ref);
-            return {
-              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-            };
-          }
+          // === NEW ISSUE TRIAGE AND MANAGEMENT HANDLERS ===
 
-          case "create_or_update_file": {
+          case "triage_issue": {
             const args = request.params.arguments as {
-              owner: string;
-              repo: string;
-              path: string;
-              message: string;
-              content: string;
-              branch?: string;
-              sha?: string;
+              title: string;
+              description: string;
+              labels?: string[];
             };
-            const result = await createOrUpdateFile(args);
+            
+            const decision = triageIssue(args.title, args.description, args.labels);
+            
             return {
-              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-            };
-          }
-
-          case "list_commits": {
-            const args = request.params.arguments as {
-              owner: string;
-              repo: string;
-              sha?: string;
-              path?: string;
-              page?: number;
-              perPage?: number;
-            };
-            const result = await listCommits(args);
-            return {
-              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-            };
-          }
-
-          case "get_issue": {
-            const args = request.params.arguments as {
-              owner: string;
-              repo: string;
-              issue_number: number;
-            };
-            const result = await getIssue(args.owner, args.repo, args.issue_number);
-            return {
-              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(decision, null, 2),
+                },
+              ],
             };
           }
 
           case "create_issue": {
+            const args = request.params.arguments as unknown as CreateIssueInput;
+            
+            let result;
+            if (args.platform === "github") {
+              result = await createGitHubIssue(args);
+            } else {
+              result = await createLinearIssue(args);
+            }
+            
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case "get_linear_issue": {
+            const args = request.params.arguments as {
+              issueId: string;
+            };
+            
+            const issue = await getLinearIssueDetails(args.issueId);
+            
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(issue, null, 2),
+                },
+              ],
+            };
+          }
+
+          case "list_linear_issues": {
+            const args = request.params.arguments as {
+              teamId?: string;
+              limit?: number;
+            };
+            
+            const issues = await listLinearIssues(args.teamId, args.limit);
+            
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(issues, null, 2),
+                },
+              ],
+            };
+          }
+
+          case "list_linear_teams": {
+            const teams = await listLinearTeams();
+            
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(teams, null, 2),
+                },
+              ],
+            };
+          }
+
+          case "get_github_issue": {
             const args = request.params.arguments as {
               owner: string;
               repo: string;
-              title: string;
+              issueNumber: number;
+            };
+            
+            const issue = await getGitHubIssue(args.owner, args.repo, args.issueNumber);
+            
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(issue, null, 2),
+                },
+              ],
+            };
+          }
+
+          case "list_github_issues": {
+            const args = request.params.arguments as {
+              owner: string;
+              repo: string;
+              state?: "open" | "closed" | "all";
+              limit?: number;
+            };
+            
+            const issues = await listGitHubIssues(args.owner, args.repo, args.state, args.limit);
+            
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(issues, null, 2),
+                },
+              ],
+            };
+          }
+
+          case "update_github_issue": {
+            const args = request.params.arguments as {
+              owner: string;
+              repo: string;
+              issueNumber: number;
+              title?: string;
               body?: string;
+              state?: "open" | "closed";
+              labels?: string[];
               assignees?: string[];
-              labels?: string[];
             };
-            const result = await createIssue(args);
+            
+            const { owner, repo, issueNumber, ...updates } = args;
+            const issue = await updateGitHubIssue(owner, repo, issueNumber, updates);
+            
             return {
-              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(issue, null, 2),
+                },
+              ],
             };
           }
 
-          case "list_issues": {
+          case "sync_issue": {
+            const args = request.params.arguments as {
+              sourceplatform: "github" | "linear";
+              sourceId: string;
+              targetOwner?: string;
+              targetRepo?: string;
+              targetTeamId?: string;
+              syncMode?: "one-way" | "bidirectional";
+            };
+            
+            let sourceIssue;
+            let targetIssue;
+            
+            // Get source issue
+            if (args.sourceplatform === "github") {
+              if (!args.targetOwner || !args.targetRepo) {
+                throw new Error("targetOwner and targetRepo required when source is GitHub");
+              }
+              sourceIssue = await getGitHubIssue(args.targetOwner, args.targetRepo, parseInt(args.sourceId));
+              
+              // Create corresponding Linear issue
+              if (!args.targetTeamId) {
+                throw new Error("targetTeamId required when syncing GitHub issue to Linear");
+              }
+              
+              targetIssue = await createLinearIssue({
+                title: sourceIssue.title,
+                description: `Synced from GitHub: ${sourceIssue.url}\n\n${sourceIssue.body}`,
+                platform: "linear",
+                teamId: args.targetTeamId,
+                labels: sourceIssue.labels.map(l => l.name),
+              });
+            } else {
+              sourceIssue = await getLinearIssueDetails(args.sourceId);
+              
+              // Create corresponding GitHub issue
+              if (!args.targetOwner || !args.targetRepo) {
+                throw new Error("targetOwner and targetRepo required when syncing Linear issue to GitHub");
+              }
+              
+              targetIssue = await createGitHubIssue({
+                title: sourceIssue.title,
+                description: `Synced from Linear: ${sourceIssue.url}\n\n${sourceIssue.description}`,
+                platform: "github",
+                owner: args.targetOwner,
+                repo: args.targetRepo,
+                labels: sourceIssue.labels?.map(l => l.name) || [],
+              });
+            }
+            
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify({
+                    source: sourceIssue,
+                    target: targetIssue,
+                    syncMode: args.syncMode || "one-way",
+                    synced: true,
+                  }, null, 2),
+                },
+              ],
+            };
+          }
+
+          // === LUCITRA-SPECIFIC MCP HANDLERS ===
+
+          case "create_hybrid_issue": {
+            const args = request.params.arguments as unknown as CreateIssueInput & {
+              owner: string;
+              repo: string;
+              teamId: string;
+            };
+            
+            const hybridInput = {
+              ...args,
+              platform: "hybrid" as const,
+            };
+            
+            const result = await createHybridIssue(hybridInput);
+            
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(result, null, 2),
+                },
+              ],
+            };
+          }
+
+          case "prepare_agent_ready": {
             const args = request.params.arguments as {
               owner: string;
               repo: string;
-              state?: "open" | "closed" | "all";
-              labels?: string[];
-              sort?: "created" | "updated" | "comments";
-              direction?: "asc" | "desc";
-              page?: number;
-              perPage?: number;
+              issueNumber: number;
             };
-            const result = await listIssues(args);
+            
+            const githubIssue = await getGitHubIssue(args.owner, args.repo, args.issueNumber);
+            const agentReady = prepareAgentReadyIssue(githubIssue);
+            
             return {
-              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(agentReady, null, 2),
+                },
+              ],
             };
           }
 
-          case "get_pull_request": {
+          case "generate_mcp_labels": {
             const args = request.params.arguments as {
-              owner: string;
-              repo: string;
-              pull_number: number;
+              title: string;
+              body: string;
+              platform: "github" | "linear";
             };
-            const result = await getPullRequest(args.owner, args.repo, args.pull_number);
+            
+            const labels = generateMCPLabels(
+              { title: args.title, body: args.body },
+              args.platform
+            );
+            
             return {
-              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify({ labels, platform: args.platform }, null, 2),
+                },
+              ],
             };
           }
 
-          case "list_pull_requests": {
+          case "sync_cross_platform": {
             const args = request.params.arguments as {
-              owner: string;
-              repo: string;
-              state?: "open" | "closed" | "all";
-              sort?: "created" | "updated" | "popularity";
-              direction?: "asc" | "desc";
-              page?: number;
-              perPage?: number;
+              githubOwner: string;
+              githubRepo: string;
+              githubIssueNumber: number;
+              linearIssueId?: string;
             };
-            const result = await listPullRequests(args);
+            
+            const githubIssue = await getGitHubIssue(
+              args.githubOwner,
+              args.githubRepo,
+              args.githubIssueNumber
+            );
+            
+            const syncStatus = await syncCrossPlatformStatus(githubIssue, args.linearIssueId);
+            
             return {
-              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-            };
-          }
-
-          case "search_code": {
-            const args = request.params.arguments as {
-              query: string;
-              sort?: "indexed";
-              order?: "asc" | "desc";
-              page?: number;
-              perPage?: number;
-            };
-            const result = await searchCode(args);
-            return {
-              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
-            };
-          }
-
-          case "search_repositories": {
-            const args = request.params.arguments as {
-              query: string;
-              sort?: "stars" | "forks" | "help-wanted-issues" | "updated";
-              order?: "asc" | "desc";
-              page?: number;
-              perPage?: number;
-            };
-            const result = await searchRepositories(args);
-            return {
-              content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
+              content: [
+                {
+                  type: "text",
+                  text: JSON.stringify(syncStatus, null, 2),
+                },
+              ],
             };
           }
 
@@ -651,7 +859,7 @@ class GitHubServer {
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error("GitHub PR MCP server running on stdio");
+    console.error("Linear-GitHub Bridge MCP server running on stdio");
   }
 }
 

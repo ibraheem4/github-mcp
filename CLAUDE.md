@@ -18,38 +18,47 @@ Copy `.env.example` to `.env` and configure:
 
 ## Architecture Overview
 
-This is an enhanced GitHub PR MCP (Model Context Protocol) server that integrates GitHub and Linear APIs for streamlined pull request workflows.
+This is a **focused Linear-GitHub bridge MCP server** with a minimal toolset designed for efficient Linear-to-GitHub workflows.
+
+### Core Principles
+
+**Single Purpose Design**: 
+- Bridges Linear project management with GitHub repositories
+- Focuses exclusively on Linear-GitHub integration workflows
+- Does NOT duplicate basic GitHub API functionality
+- Works alongside `@modelcontextprotocol/server-github` for complete GitHub coverage
+
+**Minimal Toolset**:
+- `create_feature_pr` - Create feature PRs from Linear issues
+- `create_release_pr` - Create release PRs with change analysis  
+- `update_pr` - Update existing pull requests
 
 ### Core Components
 
 **MCP Server** (`src/index.ts`):
 - Main MCP server implementation using @modelcontextprotocol/sdk
-- Provides 3 primary tools: `create_feature_pr`, `create_release_pr`, `update_pr`
+- Provides exactly 3 focused tools for Linear-GitHub workflows
 - Handles stdio transport for MCP client communication
-- Entry point for CLI usage
-
-**Express API Server** (`src/api/index.ts`):
-- Separate HTTP API server for direct API access
-- Express.js with security middleware (cors, helmet, rate limiting)
-- Runs on port 3000 by default
-- Health check endpoint at `/health`
+- Server name: `linear-github-bridge`
 
 **GitHub Integration** (`src/utils/github.ts`):
-- Octokit client for GitHub API operations
-- Branch creation, PR creation/updates, diff analysis
-- Automatic PR title generation from commit analysis
-- File change tracking and diff processing
+- Minimal Octokit client for essential GitHub operations only:
+  - Branch creation
+  - PR creation/updates
+  - Diff analysis for releases
+  - Change categorization
+- **Note**: Basic GitHub operations delegated to standard GitHub MCP server
 
 **Linear Integration** (`src/utils/linear.ts`):
 - Linear SDK client for issue management
 - Feature PR description generation from Linear issues
 - Release PR description generation from merged PRs
-- Issue metadata extraction and formatting
+- Issue metadata extraction and branch name generation
 
 ### Data Flow
 
-1. **Feature PRs**: Linear Issue → Branch Creation → PR with Generated Description
-2. **Release PRs**: Diff Analysis → PR List → Formatted Release Notes
+1. **Feature PRs**: Linear Issue → Branch Creation → Rich PR with Generated Description
+2. **Release PRs**: Branch Diff Analysis → PR Categorization → Formatted Release Notes
 3. **PR Updates**: Direct GitHub API calls with structured content
 
 ### TypeScript Configuration
@@ -62,11 +71,39 @@ This is an enhanced GitHub PR MCP (Model Context Protocol) server that integrate
 
 ### Key Design Patterns
 
-- **Dual Server Architecture**: MCP server for Claude integration + Express API for direct access
+- **Focused Architecture**: Single-purpose server with minimal tool surface area
 - **Environment-based Configuration**: All API keys via environment variables
-- **Type-safe API Contracts**: Comprehensive TypeScript interfaces in src/types/
+- **Type-safe Contracts**: Comprehensive TypeScript interfaces in src/types/
 - **Error Handling**: MCP-compliant error responses with proper error codes
 - **Modular Utilities**: Separated GitHub and Linear logic for maintainability
+
+### Integration Strategy
+
+This server is designed to work **alongside** other MCP servers:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": { "GITHUB_TOKEN": "..." }
+    },
+    "linear-github-bridge": {
+      "command": "npx", 
+      "args": ["-y", "@ibraheem4/github-mcp"],
+      "env": { 
+        "GITHUB_TOKEN": "...",
+        "LINEAR_API_KEY": "..."
+      }
+    }
+  }
+}
+```
+
+**Usage Pattern**:
+- Use `github` server for: File operations, issue management, basic GitHub API calls
+- Use `linear-github-bridge` server for: Linear-specific workflows, structured PR creation
 
 ### Package Distribution
 
@@ -74,3 +111,17 @@ This is an enhanced GitHub PR MCP (Model Context Protocol) server that integrate
 - Executable binary at `build/index.js` (chmod 755)
 - ES module package with strict Node.js 18+ requirement
 - Includes only /build directory in published package
+
+### Development Guidelines
+
+**When adding new features**:
+1. Ensure the feature relates specifically to Linear-GitHub integration
+2. Avoid duplicating functionality available in standard GitHub MCP server
+3. Focus on workflow enhancement rather than basic API coverage
+4. Maintain the minimal toolset philosophy
+
+**Code Quality**:
+- Strict TypeScript with comprehensive error handling
+- Modular architecture with clear separation of concerns
+- Environment-based configuration for security
+- MCP-compliant tool interfaces and error responses

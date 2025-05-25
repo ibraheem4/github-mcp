@@ -4,6 +4,8 @@ import {
   PullRequestChange,
   BranchDiff,
   DiffAnalysis,
+  GitHubIssue,
+  CreateIssueInput,
 } from "../types/index.js";
 import { LinearIssue, LinearAttachment } from "../types/linear.js";
 
@@ -581,4 +583,139 @@ export async function searchRepositories(params: {
     per_page: params.perPage || 30,
   });
   return data;
+}
+
+// === NEW GITHUB ISSUE MANAGEMENT FUNCTIONS ===
+
+export async function getGitHubIssue(owner: string, repo: string, issueNumber: number): Promise<GitHubIssue> {
+  const { data: issue } = await octokit.issues.get({
+    owner,
+    repo,
+    issue_number: issueNumber,
+  });
+
+  return {
+    id: issue.id,
+    number: issue.number,
+    title: issue.title,
+    body: issue.body || "",
+    state: issue.state as "open" | "closed",
+    labels: issue.labels.map((label: any) => ({
+      name: typeof label === 'string' ? label : label.name,
+      color: typeof label === 'string' ? '' : label.color || '',
+    })),
+    assignee: issue.assignee ? {
+      login: issue.assignee.login,
+      id: issue.assignee.id,
+    } : undefined,
+    url: issue.html_url,
+    createdAt: issue.created_at,
+    updatedAt: issue.updated_at,
+  };
+}
+
+export async function listGitHubIssues(
+  owner: string, 
+  repo: string, 
+  state: "open" | "closed" | "all" = "open",
+  limit: number = 50
+): Promise<GitHubIssue[]> {
+  const { data: issues } = await octokit.issues.listForRepo({
+    owner,
+    repo,
+    state,
+    per_page: limit,
+  });
+
+  return issues.map(issue => ({
+    id: issue.id,
+    number: issue.number,
+    title: issue.title,
+    body: issue.body || "",
+    state: issue.state as "open" | "closed",
+    labels: issue.labels.map((label: any) => ({
+      name: typeof label === 'string' ? label : label.name,
+      color: typeof label === 'string' ? '' : label.color || '',
+    })),
+    assignee: issue.assignee ? {
+      login: issue.assignee.login,
+      id: issue.assignee.id,
+    } : undefined,
+    url: issue.html_url,
+    createdAt: issue.created_at,
+    updatedAt: issue.updated_at,
+  }));
+}
+
+export async function createGitHubIssue(input: CreateIssueInput): Promise<GitHubIssue> {
+  if (!input.owner || !input.repo) {
+    throw new Error("owner and repo are required for creating GitHub issues");
+  }
+
+  const { data: issue } = await octokit.issues.create({
+    owner: input.owner,
+    repo: input.repo,
+    title: input.title,
+    body: input.description,
+    labels: input.labels || [],
+    assignees: input.assignee ? [input.assignee] : [],
+  });
+
+  return {
+    id: issue.id,
+    number: issue.number,
+    title: issue.title,
+    body: issue.body || "",
+    state: issue.state as "open" | "closed",
+    labels: issue.labels.map((label: any) => ({
+      name: typeof label === 'string' ? label : label.name,
+      color: typeof label === 'string' ? '' : label.color || '',
+    })),
+    assignee: issue.assignee ? {
+      login: issue.assignee.login,
+      id: issue.assignee.id,
+    } : undefined,
+    url: issue.html_url,
+    createdAt: issue.created_at,
+    updatedAt: issue.updated_at,
+  };
+}
+
+export async function updateGitHubIssue(
+  owner: string,
+  repo: string,
+  issueNumber: number,
+  updates: {
+    title?: string;
+    body?: string;
+    state?: "open" | "closed";
+    labels?: string[];
+    assignees?: string[];
+  }
+): Promise<GitHubIssue> {
+  const { data: issue } = await octokit.issues.update({
+    owner,
+    repo,
+    issue_number: issueNumber,
+    ...updates,
+  });
+
+  return {
+    id: issue.id,
+    number: issue.number,
+    title: issue.title,
+    body: issue.body || "",
+    state: issue.state as "open" | "closed",
+    labels: issue.labels.map((label: any) => ({
+      name: typeof label === 'string' ? label : label.name,
+      color: typeof label === 'string' ? '' : label.color || '',
+    })),
+    assignee: issue.assignee ? {
+      login: issue.assignee.login,
+      id: issue.assignee.id,
+    } : undefined,
+    url: issue.html_url,
+    createdAt: issue.created_at,
+    updatedAt: issue.updated_at,
+  };
 }

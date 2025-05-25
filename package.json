@@ -1,7 +1,7 @@
 {
   "name": "@ibraheem4/github-mcp",
   "version": "3.2.0",
-  "description": "A GitHub Pull Request MCP server for enhanced PR management",
+  "description": "A Linear-GitHub bridge MCP server for seamless PR creation from Linear issues",
   "type": "module",
   "bin": {
     "github-mcp": "build/index.js",
@@ -45,10 +45,12 @@
   },
   "keywords": [
     "github",
+    "linear",
     "mcp",
     "model-context-protocol",
     "pull-request",
-    "cli"
+    "bridge",
+    "integration"
   ],
   "author": "Ibraheem Abdul-Malik",
   "license": "MIT",
